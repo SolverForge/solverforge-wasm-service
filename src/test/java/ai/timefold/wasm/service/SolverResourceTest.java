@@ -68,8 +68,19 @@ public class SolverResourceTest {
                             (func (export "isEmployeeId0") (param $shift i32) (param $employee i32) (result i32)
                                 (i32.eq (local.get $shift) (i32.load) (i32.load) (i32.const 0))
                             )
+                            (func (export "alloc") (param $size i32) (result i32)
+                                (local $out i32) (i32.const 0) (i32.load) (local.set $out) (i32.const 0) (i32.add (local.get $out) (local.get $size)) (i32.store) (local.get $out)
+                            )
+                            (func (export "dealloc") (param $pointer i32) (result)
+                                return
+                            )
+                            (func (export "_start") (result)
+                                (i32.const 0) (i32.const 32) (i32.store)
+                            )
                         )
                         """)),
+                "alloc",
+                "dealloc",
                 Map.of(
                         "employees", List.of(
                                 Map.of("id", 0),

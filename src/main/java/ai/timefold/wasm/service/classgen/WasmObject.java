@@ -16,43 +16,39 @@ public class WasmObject {
     private final static ConcurrentReferenceHashMap<Instance, ConcurrentReferenceHashMap<Integer, WasmObject>> referenceMap = (ConcurrentReferenceHashMap) ConcurrentReferenceHashMap.builder()
             .weakKeys().strongValues().get();
 
+    public final Allocator allocator;
     public final Instance wasmInstance;
     public final int memoryPointer;
-    private final int size;
 
     private List<WasmObject> ownedObjects;
-
-    private static int nextPtr = Integer.SIZE; // 0 is null
 
     public WasmObject() {
         // Required for cloning
         memoryPointer = 0;
-        size = 0;
         wasmInstance = null;
         ownedObjects = null;
+        allocator = null;
     }
 
-    public WasmObject(Instance wasmInstance, int size) {
+    public WasmObject(Allocator allocator, Instance wasmInstance, int size) {
+        this.allocator = allocator;
         this.wasmInstance = wasmInstance;
-        this.size = size;
         @SuppressWarnings({"rawtypes", "unchecked"})
         var map = referenceMap.computeIfAbsent(wasmInstance,
                 ignored -> (ConcurrentReferenceHashMap) ConcurrentReferenceHashMap.builder().strongKeys().weakValues().get());
 
-        var newPointer = nextPtr;
-        nextPtr += size;
+        var newPointer = allocator.allocate(size);
         memoryPointer = newPointer;
         cleaner.register(this, () -> {
-            // TODO: free memory
-            //wasmInstance.memory().apply(newPointer);
+            allocator.free(newPointer);
         });
         map.put(memoryPointer, this);
     }
 
-    public WasmObject(Instance wasmInstance, int memoryPointer, int size) {
+    public WasmObject(Instance wasmInstance, int memoryPointer) {
+        this.allocator = null;
         this.wasmInstance = wasmInstance;
         this.memoryPointer = memoryPointer;
-        this.size = size;
     }
 
     public int getMemoryPointer() {
@@ -64,8 +60,8 @@ public class WasmObject {
             ownedObjects = new ArrayList<>();
         }
         var length = value.getBytes().length;
-        var wasmString = new WasmObject(wasmInstance, length);
-        wasmInstance.memory().writeString(wasmString.memoryPointer, value);
+        var wasmString = new WasmObject(allocator, wasmInstance, length + 1);
+        wasmInstance.memory().writeCString(wasmString.memoryPointer, value);
         ownedObjects.add(wasmString);
         return wasmString.memoryPointer;
     }
@@ -74,7 +70,7 @@ public class WasmObject {
         if (ownedObjects == null) {
             ownedObjects = new ArrayList<>();
         }
-        var wasmArray = new WasmObject(wasmInstance, elementSize * (arrayLength + 1));
+        var wasmArray = new WasmObject(allocator, wasmInstance, elementSize * (arrayLength + 1));
         ownedObjects.add(wasmArray);
         wasmArray.writeIntField(0, arrayLength);
         return wasmArray;
@@ -139,6 +135,6 @@ public class WasmObject {
 
     public static WasmObject ofExisting(Instance wasmInstance,
             int memoryPointer) {
-        return referenceMap.get(wasmInstance).computeIfAbsent(memoryPointer, ignored -> new WasmObject(wasmInstance, memoryPointer, 0));
+        return referenceMap.get(wasmInstance).computeIfAbsent(memoryPointer, ignored -> new WasmObject(wasmInstance, memoryPointer));
     }
 }

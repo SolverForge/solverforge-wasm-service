@@ -29,6 +29,10 @@ public class PlanningProblem {
 
     byte[] wasm;
 
+    String allocator;
+
+    String deallocator;
+
     Map<String, Object> problem;
 
     @JsonCreator
@@ -36,12 +40,16 @@ public class PlanningProblem {
             @JsonProperty("penalty") List<WasmConstraint> penaltyConstraintList,
             @JsonProperty("reward") List<WasmConstraint> rewardConstraintList,
             @JsonProperty("wasm") String wasm,
+            @JsonProperty("allocator") String allocator,
+            @JsonProperty("deallocator") String deallocator,
             @JsonProperty("problem") Map<String, Object> problem) {
         this.domainObjectMap = domainObjectMap;
         this.penaltyConstraintList = penaltyConstraintList;
         this.rewardConstraintList = rewardConstraintList;
         this.problem = problem;
         this.wasm = Base64.getDecoder().decode(wasm);
+        this.allocator = allocator;
+        this.deallocator = deallocator;
 
         entityClassList = new ArrayList<>();
         for (var entry : domainObjectMap.entrySet()) {
@@ -101,5 +109,13 @@ public class PlanningProblem {
 
     public byte[] getWasm() {
         return wasm;
+    }
+
+    public String getAllocator() {
+        return allocator;
+    }
+
+    public String getDeallocator() {
+        return deallocator;
     }
 }

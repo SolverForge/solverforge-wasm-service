@@ -81,6 +81,8 @@ public class PlanningProblemDeserializationTest {
                 penalties,
                 rewards,
                 Base64.getEncoder().encodeToString(new byte[] {1, 2, 3}),
+                "alloc",
+                "dealloc",
                 input
         );
         assertThat((Object) objectMapper.readerFor(PlanningProblem.class).readValue(
@@ -141,6 +143,8 @@ public class PlanningProblemDeserializationTest {
                            }
                        ],
                        "wasm": "%s",
+                       "allocator": "alloc",
+                       "deallocator": "dealloc",
                        "problem": {
                            "employees": [
                                {"name": "Ann"}, {"name": "Beth"}

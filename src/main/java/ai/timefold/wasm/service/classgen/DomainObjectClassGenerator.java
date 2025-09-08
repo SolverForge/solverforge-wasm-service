@@ -57,6 +57,7 @@ public class DomainObjectClassGenerator {
     }
 
     static final ClassDesc wasmObjectDesc = getDescriptor(WasmObject.class);
+    static final ClassDesc allocatorDesc = getDescriptor(Allocator.class);
     static final ClassDesc instanceDesc = getDescriptor(Instance.class);
     static final ClassDesc mapDesc = getDescriptor(Map.class);
 
@@ -281,10 +282,16 @@ public class DomainObjectClassGenerator {
                     codeBuilder.new_(getWasmTypeDesc(type));
                     codeBuilder.dup_x1();
                     codeBuilder.swap();
+
+                    codeBuilder.aload(0);
+                    codeBuilder.getfield(wasmObjectDesc, "allocator", allocatorDesc);
+                    codeBuilder.swap();
+
                     codeBuilder.aload(0);
                     codeBuilder.getfield(wasmObjectDesc, "wasmInstance", instanceDesc);
                     codeBuilder.swap();
-                    codeBuilder.invokespecial(getWasmTypeDesc(type), "<init>", MethodTypeDesc.of(voidDesc, instanceDesc, mapDesc));
+
+                    codeBuilder.invokespecial(getWasmTypeDesc(type), "<init>", MethodTypeDesc.of(voidDesc, allocatorDesc, instanceDesc, mapDesc));
 
                     codeBuilder.labelBinding(isWasmObjectLabel);
                     codeBuilder.checkcast(wasmObjectDesc);
@@ -346,8 +353,9 @@ public class DomainObjectClassGenerator {
                     if (element instanceof Map map) {
                         var elementClass = domainObjectClassGenerator.get().getClassForDomainClassName(elementType);
                         var wasmInstance = wasmArray.wasmInstance;
+                        var allocator = wasmArray.allocator;
                         try {
-                            var newInstance = (WasmObject) elementClass.getConstructor(Instance.class, Map.class).newInstance(wasmInstance, map);
+                            var newInstance = (WasmObject) elementClass.getConstructor(Allocator.class, Instance.class, Map.class).newInstance(allocator, wasmInstance, map);
                             wasmMemory.writeI32(elementLocation, newInstance.memoryPointer);
                         } catch (InstantiationException | NoSuchMethodException | InvocationTargetException |
                                 IllegalAccessException e) {
@@ -380,7 +388,6 @@ public class DomainObjectClassGenerator {
             var isPlanningEntity = false;
             var isPlanningSolution = false;
             classBuilder.withSuperclass(wasmObjectDesc);
-            //classBuilder.withInterfaceSymbols(getDescriptor(PlanningCloneable.class));
 
             // No-args constructor
             classBuilder.withMethodBody("<init>", MethodTypeDesc.of(voidDesc), ClassFile.ACC_PUBLIC, codeBuilder -> {
@@ -390,26 +397,28 @@ public class DomainObjectClassGenerator {
             });
 
             // instance constructor
-            classBuilder.withMethodBody("<init>", MethodTypeDesc.of(voidDesc, instanceDesc), ClassFile.ACC_PUBLIC, codeBuilder -> {
+            classBuilder.withMethodBody("<init>", MethodTypeDesc.of(voidDesc, allocatorDesc, instanceDesc), ClassFile.ACC_PUBLIC, codeBuilder -> {
                 codeBuilder.aload(0);
                 codeBuilder.aload(1);
+                codeBuilder.aload(2);
                 codeBuilder.loadConstant(wasmOffsets.totalSize);
-                codeBuilder.invokespecial(wasmObjectDesc, "<init>", MethodTypeDesc.of(voidDesc, instanceDesc, intDesc));
+                codeBuilder.invokespecial(wasmObjectDesc, "<init>", MethodTypeDesc.of(voidDesc, allocatorDesc, instanceDesc, intDesc));
                 codeBuilder.return_();
             });
 
             // instance + map constructor
-            classBuilder.withMethodBody("<init>", MethodTypeDesc.of(voidDesc, instanceDesc, mapDesc), ClassFile.ACC_PUBLIC, codeBuilder -> {
+            classBuilder.withMethodBody("<init>", MethodTypeDesc.of(voidDesc, allocatorDesc, instanceDesc, mapDesc), ClassFile.ACC_PUBLIC, codeBuilder -> {
                 codeBuilder.aload(0);
                 codeBuilder.aload(1);
+                codeBuilder.aload(2);
                 codeBuilder.loadConstant(wasmOffsets.totalSize);
-                codeBuilder.invokespecial(wasmObjectDesc, "<init>", MethodTypeDesc.of(voidDesc, instanceDesc, intDesc));
+                codeBuilder.invokespecial(wasmObjectDesc, "<init>", MethodTypeDesc.of(voidDesc, allocatorDesc, instanceDesc, intDesc));
 
                 for (var field : domainObject.getFieldDescriptorMap().entrySet()) {
                     var key = field.getKey();
                     var offset = wasmOffsets.nameToMemoryOffset.get(key);
                     writeWasmField(codeBuilder, offset, field.getValue().getType(), valueBuilder -> {
-                        valueBuilder.aload(2);
+                        valueBuilder.aload(3);
                         valueBuilder.loadConstant(key);
                         valueBuilder.invokeinterface(mapDesc, "get", MethodTypeDesc.of(objectDesc, objectDesc));
                         convertObjectToWasmValue(valueBuilder, field.getValue().getType());
@@ -592,27 +601,9 @@ public class DomainObjectClassGenerator {
                 }
                 codeBuilder.return_(TypeKind.REFERENCE);
             });
-
-            // createNewInstance
-//            classBuilder.withMethodBody("createNewInstance",
-//                    MethodTypeDesc.of(objectDesc), ClassFile.ACC_PUBLIC,
-//                    codeBuilder -> {
-//                        codeBuilder.new_(ClassDesc.ofInternalName(domainObject.getName()));
-//                        codeBuilder.dup();
-//
-//                        codeBuilder.aload(0);
-//                        codeBuilder.getfield(wasmObjectDesc, "wasmInstance", instanceDesc);
-//                        codeBuilder.invokespecial(ClassDesc.ofInternalName(domainObject.getName()),
-//                                "<init>", MethodTypeDesc.of(voidDesc, instanceDesc));
-//                        codeBuilder.return_(TypeKind.REFERENCE);
-//                    });
         });
 
         classNameToBytecode.put(domainObject.getName(), classBytes);
-    }
-
-    public Class<?> getClassForDomainObject(DomainObject domainObject) {
-        return getClassForDomainClassName(domainObject.getName());
     }
 
     public Class<?> getClassForDomainClassName(String className) {

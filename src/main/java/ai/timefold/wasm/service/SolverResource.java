@@ -12,6 +12,7 @@ import ai.timefold.solver.core.api.solver.SolverFactory;
 import ai.timefold.solver.core.config.solver.SolverConfig;
 import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
 import ai.timefold.solver.core.impl.util.MutableReference;
+import ai.timefold.wasm.service.classgen.Allocator;
 import ai.timefold.wasm.service.classgen.ConstraintProviderClassGenerator;
 import ai.timefold.wasm.service.classgen.DomainObjectClassGenerator;
 import ai.timefold.wasm.service.classgen.WasmObject;
@@ -75,13 +76,15 @@ public class SolverResource {
                 .withMemoryFactory(ByteArrayMemory::new)
                 .withMachineFactory(MachineFactoryCompiler::compile)
                 .build();
+        out.initialize(true);
         return out;
     }
 
     private Object convertPlanningProblem(Instance wasmInstance, DomainObjectClassGenerator classGenerator, PlanningProblem planningProblem) {
         var solutionClass = classGenerator.getClassForDomainClassName(planningProblem.getSolutionClass());
+        var allocator = new Allocator(wasmInstance, planningProblem.getAllocator(), planningProblem.getDeallocator());
         try {
-            return solutionClass.getConstructor(Instance.class, Map.class).newInstance(wasmInstance, planningProblem.getProblem());
+            return solutionClass.getConstructor(Allocator.class, Instance.class, Map.class).newInstance(allocator, wasmInstance, planningProblem.getProblem());
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
