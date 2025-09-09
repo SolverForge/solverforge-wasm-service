@@ -137,4 +137,9 @@ public class WasmObject {
             int memoryPointer) {
         return referenceMap.get(wasmInstance).computeIfAbsent(memoryPointer, ignored -> new WasmObject(wasmInstance, memoryPointer));
     }
+
+    public static WasmObject ofExistingOrDefault(Instance wasmInstance,
+            int memoryPointer, WasmObject defaultValue) {
+        return referenceMap.get(wasmInstance).computeIfAbsent(memoryPointer, ignored -> defaultValue);
+    }
 }

@@ -14,12 +14,22 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class FieldDescriptor {
     String type;
     @Nullable
+    DomainAccessor accessor;
+    @Nullable
     List<PlanningAnnotation> annotations;
 
+    public FieldDescriptor(String type,
+            List<PlanningAnnotation> annotations) {
+        this(type, null, annotations);
+    }
+
     @JsonCreator
-    public FieldDescriptor(@JsonProperty("type") String type, @JsonProperty("annotations") @Nullable List<PlanningAnnotation> annotations) {
+    public FieldDescriptor(@JsonProperty("type") String type,
+            @JsonProperty("accessor") @Nullable DomainAccessor accessor,
+            @JsonProperty("annotations") @Nullable List<PlanningAnnotation> annotations) {
         this.type = type;
         this.annotations = annotations;
+        this.accessor = accessor;
     }
 
     public String getType() {
@@ -28,5 +38,9 @@ public class FieldDescriptor {
 
     public @Nullable List<PlanningAnnotation> getAnnotations() {
         return annotations;
+    }
+
+    public @Nullable DomainAccessor getAccessor() {
+        return accessor;
     }
 }

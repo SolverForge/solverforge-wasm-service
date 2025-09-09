@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 import ai.timefold.solver.core.api.score.buildin.simple.SimpleScore;
+import ai.timefold.wasm.service.dto.DomainAccessor;
+import ai.timefold.wasm.service.dto.DomainListAccessor;
 import ai.timefold.wasm.service.dto.DomainObject;
 import ai.timefold.wasm.service.dto.FieldDescriptor;
 import ai.timefold.wasm.service.dto.PlanningProblem;
@@ -37,7 +39,9 @@ public class SolverResourceTest {
                         ),
                         "Shift",
                         new DomainObject(
-                                Map.of("employee", new FieldDescriptor("Employee", List.of(new DomainPlanningVariable(false))))
+                                Map.of("employee", new FieldDescriptor("Employee",
+                                        new DomainAccessor("getEmployee", "setEmployee"),
+                                        List.of(new DomainPlanningVariable(false))))
                         ),
                         "Schedule",
                         new DomainObject(
@@ -64,9 +68,15 @@ public class SolverResourceTest {
                 Base64.getEncoder().encodeToString(Wat2Wasm.parse(
                         """
                         (module
-                            (memory 1024)
+                            (memory 1)
+                            (func (export "getEmployee") (param $shift i32) (result i32)
+                                (local.get $shift) (i32.load)
+                            )
+                            (func (export "setEmployee") (param $shift i32) (param $employee i32) (result)
+                                (local.get $shift) (local.get $employee) (i32.store)
+                            )
                             (func (export "isEmployeeId0") (param $shift i32) (param $employee i32) (result i32)
-                                (i32.eq (local.get $shift) (i32.load) (i32.load) (i32.const 0))
+                                (i32.eq (local.get $shift) (call 0) (i32.load) (i32.const 0))
                             )
                             (func (export "alloc") (param $size i32) (result i32)
                                 (local $out i32) (i32.const 0) (i32.load) (local.set $out) (i32.const 0) (i32.add (local.get $out) (local.get $size)) (i32.store) (local.get $out)
@@ -81,6 +91,15 @@ public class SolverResourceTest {
                         """)),
                 "alloc",
                 "dealloc",
+                new DomainListAccessor(
+                        "newList",
+                        "getItem",
+                        "setItem",
+                        "size",
+                        "append",
+                        "insert",
+                        "remove"
+                ),
                 Map.of(
                         "employees", List.of(
                                 Map.of("id", 0),

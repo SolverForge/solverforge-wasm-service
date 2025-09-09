@@ -83,6 +83,15 @@ public class PlanningProblemDeserializationTest {
                 Base64.getEncoder().encodeToString(new byte[] {1, 2, 3}),
                 "alloc",
                 "dealloc",
+                new DomainListAccessor(
+                        "newList",
+                        "getItem",
+                        "setItem",
+                        "size",
+                        "append",
+                        "insert",
+                        "remove"
+                ),
                 input
         );
         assertThat((Object) objectMapper.readerFor(PlanningProblem.class).readValue(
@@ -90,35 +99,39 @@ public class PlanningProblemDeserializationTest {
                    {
                        "domain": {
                            "Employee": {
-                               "name": {"type": "String"}
+                               "fields": {"name": {"type": "String"}}
                            },
                            "Shift": {
-                               "start": {"type": "int"},
-                               "end": {"type": "int"},
-                               "employee": {
-                                   "type": "Employee",
-                                   "annotations": [{"annotation": "PlanningVariable", "allowsUnassigned": true}]
+                               "fields": {
+                                   "start": {"type": "int"},
+                                   "end": {"type": "int"},
+                                   "employee": {
+                                       "type": "Employee",
+                                       "annotations": [{"annotation": "PlanningVariable", "allowsUnassigned": true}]
+                                   }
                                }
                            },
                            "Schedule": {
-                               "employees": {
-                                   "type": "Employee[]",
-                                   "annotations": [
-                                       {"annotation": "ProblemFactCollectionProperty"},
-                                       {"annotation": "ValueRangeProvider"}
-                                   ]
-                               },
-                               "shifts": {
-                                   "type": "Shift[]",
-                                   "annotations": [
-                                       {"annotation": "PlanningEntityCollectionProperty"}
-                                   ]
-                               },
-                               "score": {
-                                   "type": "SimpleScore",
-                                   "annotations": [
-                                       {"annotation": "PlanningScore"}
-                                   ]
+                               "fields": {
+                                   "employees": {
+                                       "type": "Employee[]",
+                                       "annotations": [
+                                           {"annotation": "ProblemFactCollectionProperty"},
+                                           {"annotation": "ValueRangeProvider"}
+                                       ]
+                                   },
+                                   "shifts": {
+                                       "type": "Shift[]",
+                                       "annotations": [
+                                           {"annotation": "PlanningEntityCollectionProperty"}
+                                       ]
+                                   },
+                                   "score": {
+                                       "type": "SimpleScore",
+                                       "annotations": [
+                                           {"annotation": "PlanningScore"}
+                                       ]
+                                   }
                                }
                            }
                        },
@@ -145,6 +158,15 @@ public class PlanningProblemDeserializationTest {
                        "wasm": "%s",
                        "allocator": "alloc",
                        "deallocator": "dealloc",
+                       "listAccessor": {
+                           "new": "newList",
+                           "get": "getItem",
+                           "set": "setItem",
+                           "length": "size",
+                           "append": "append",
+                           "insert": "insert",
+                           "remove": "remove"
+                       },
                        "problem": {
                            "employees": [
                                {"name": "Ann"}, {"name": "Beth"}
