@@ -17,6 +17,7 @@ import ai.timefold.solver.core.api.score.buildin.simple.SimpleScore;
 import ai.timefold.solver.core.api.score.stream.Constraint;
 import ai.timefold.solver.core.api.score.stream.ConstraintFactory;
 import ai.timefold.solver.core.api.score.stream.ConstraintProvider;
+import ai.timefold.wasm.service.SolverResource;
 import ai.timefold.wasm.service.dto.PlanningProblem;
 import ai.timefold.wasm.service.dto.WasmConstraint;
 import ai.timefold.wasm.service.dto.annotation.DomainPlanningScore;
@@ -130,7 +131,8 @@ public class ConstraintProviderClassGenerator {
                         codeBuilder.return_(TypeKind.REFERENCE);
                     });
         });
-        var out = domainObjectClassGenerator.defineConstraintProviderClass(constraintProviderClassName, classBytes);
+        SolverResource.GENERATED_CLASS_LOADER.get().addClass(constraintProviderClassName, classBytes);
+        var out = SolverResource.GENERATED_CLASS_LOADER.get().getClassForDomainClassName(constraintProviderClassName);
         for (var initializer : classInitializerList) {
             initializer.accept(out);
         }
@@ -140,6 +142,7 @@ public class ConstraintProviderClassGenerator {
 
     private DataStream generateConstraintBody(ClassDesc generatedClass, ClassBuilder classBuilder, CodeBuilder codeBuilder, WasmConstraint wasmConstraint) {
         DataStream dataStream = new DataStream();
+        var classLoader = SolverResource.GENERATED_CLASS_LOADER.get();
         for (var steamComponent : wasmConstraint.getStreamComponentList()) {
             var streamDesc = getDescriptor(dataStream.getConstraintStreamClass());
             var predicateDesc = getDescriptor(dataStream.getPredicateClass());
@@ -148,7 +151,7 @@ public class ConstraintProviderClassGenerator {
             switch (steamComponent) {
                 case ForEachComponent forEachComponent -> {
                     codeBuilder.aload(1);
-                    codeBuilder.loadConstant(getDescriptor(domainObjectClassGenerator.getClassForDomainClassName(
+                    codeBuilder.loadConstant(getDescriptor(classLoader.getClassForDomainClassName(
                             forEachComponent.className())));
                     codeBuilder.invokeinterface(constraintFactoryDesc, "forEach", MethodTypeDesc.of(streamDesc, getDescriptor(Class.class)));
                 }
@@ -168,7 +171,7 @@ public class ConstraintProviderClassGenerator {
                     codeBuilder.invokeinterface(streamDesc, "filter", MethodTypeDesc.of(streamDesc, predicateDesc));
                 }
                 case JoinComponent(String className) -> {
-                    codeBuilder.loadConstant(getDescriptor(domainObjectClassGenerator.getClassForDomainClassName(className)));
+                    codeBuilder.loadConstant(getDescriptor(classLoader.getClassForDomainClassName(className)));
                     codeBuilder.invokeinterface(streamDesc, "join", MethodTypeDesc.of(
                             getDescriptor(dataStream.getConstraintStreamClassWithExtras(1)), getDescriptor(Class.class)));
                 }

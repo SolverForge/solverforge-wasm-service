@@ -2,6 +2,7 @@ package ai.timefold.wasm.service.dto;
 
 import java.util.List;
 
+import ai.timefold.wasm.service.dto.annotation.DomainPlanningScore;
 import ai.timefold.wasm.service.dto.annotation.PlanningAnnotation;
 
 import org.jspecify.annotations.NullMarked;
@@ -25,11 +26,14 @@ public class FieldDescriptor {
 
     @JsonCreator
     public FieldDescriptor(@JsonProperty("type") String type,
-            @JsonProperty("accessor") @Nullable DomainAccessor accessor,
+            @JsonProperty("accessor") DomainAccessor accessor,
             @JsonProperty("annotations") @Nullable List<PlanningAnnotation> annotations) {
         this.type = type;
         this.annotations = annotations;
         this.accessor = accessor;
+        if (accessor == null && annotations != null && !annotations.stream().anyMatch(annotation -> annotation instanceof DomainPlanningScore)) {
+            throw new IllegalArgumentException("accessor must be specified for any non-PlanningScore planning attribute");
+        }
     }
 
     public String getType() {

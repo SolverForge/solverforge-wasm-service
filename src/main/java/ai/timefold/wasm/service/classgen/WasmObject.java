@@ -4,6 +4,7 @@ import java.lang.ref.Cleaner;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntFunction;
 
 import org.apache.commons.collections4.map.ConcurrentReferenceHashMap;
 
@@ -49,6 +50,9 @@ public class WasmObject {
         this.allocator = null;
         this.wasmInstance = wasmInstance;
         this.memoryPointer = memoryPointer;
+        var map = referenceMap.computeIfAbsent(wasmInstance,
+                ignored -> (ConcurrentReferenceHashMap) ConcurrentReferenceHashMap.builder().strongKeys().weakValues().get());
+        map.putIfAbsent(memoryPointer, this);
     }
 
     public int getMemoryPointer() {
@@ -141,5 +145,11 @@ public class WasmObject {
     public static WasmObject ofExistingOrDefault(Instance wasmInstance,
             int memoryPointer, WasmObject defaultValue) {
         return referenceMap.get(wasmInstance).computeIfAbsent(memoryPointer, ignored -> defaultValue);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <Item_ extends WasmObject> Item_ ofExistingOrCreate(Instance wasmInstance,
+            int memoryPointer, IntFunction<Item_> factory) {
+        return (Item_) referenceMap.get(wasmInstance).computeIfAbsent(memoryPointer, factory::apply);
     }
 }

@@ -1,6 +1,8 @@
 package ai.timefold.wasm.service.classgen;
 
 import java.util.function.IntBinaryOperator;
+import java.util.function.IntFunction;
+import java.util.function.IntSupplier;
 import java.util.function.IntUnaryOperator;
 
 import ai.timefold.wasm.service.dto.DomainListAccessor;
@@ -20,7 +22,7 @@ public final class WasmListAccessor {
 
     private final Instance wasmInstance;
 
-    private final IntUnaryOperator createListFunction;
+    private final IntSupplier createListFunction;
     private final IntBinaryOperator getListItemFunction;
     private final IntTriConsumer setListItemFunction;
     private final IntUnaryOperator getListSizeFunction;
@@ -39,7 +41,7 @@ public final class WasmListAccessor {
         var domainInsertListItem = instance.export(domainListAccessor.insertFunction());
         var domainRemoveListItem = instance.export(domainListAccessor.removeFunction());
 
-        createListFunction = size -> (int) domainCreateList.apply(size)[0];
+        createListFunction = () -> (int) domainCreateList.apply()[0];
         getListItemFunction = (list, index) -> (int) domainGetListItem.apply(list, index)[0];
         setListItemFunction = domainSetListItem::apply;
         getListSizeFunction = list -> (int) domainGetListSize.apply(list)[0];
@@ -49,16 +51,13 @@ public final class WasmListAccessor {
     }
 
     public WasmObject newInstance() {
-        return WasmObject.ofExisting(wasmInstance, createListFunction.applyAsInt(0));
+        return WasmObject.ofExisting(wasmInstance, createListFunction.getAsInt());
     }
 
-    public WasmObject newInstance(int initialCapacity) {
-        return WasmObject.ofExisting(wasmInstance, createListFunction.applyAsInt(initialCapacity));
-    }
-
-    public WasmObject getItem(WasmObject list, int index) {
-        return WasmObject.ofExisting(wasmInstance,
-                getListItemFunction.applyAsInt(list.memoryPointer, index));
+    public <Item_ extends WasmObject> Item_ getItem(WasmObject list, int index, IntFunction<Item_> memoryPointerToItem) {
+        return WasmObject.ofExistingOrCreate(wasmInstance,
+                getListItemFunction.applyAsInt(list.memoryPointer, index),
+                memoryPointerToItem);
     }
 
     public void setItem(WasmObject list, int index, WasmObject item) {

@@ -2,13 +2,21 @@ package ai.timefold.wasm.service.classgen;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.AbstractList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.IntFunction;
 
-import ai.timefold.solver.core.impl.domain.solution.cloner.PlanningCloneable;
+import ai.timefold.wasm.service.SolverResource;
+
+import org.apache.commons.collections4.map.ConcurrentReferenceHashMap;
 
 import com.dylibso.chicory.runtime.Instance;
 
-public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_> implements PlanningCloneable<WasmList<Item_>> {
+public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_> {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static final ConcurrentReferenceHashMap<Instance, Map<Integer, WasmList<?>>> wasmInstanceToListCache = (ConcurrentReferenceHashMap) new ConcurrentReferenceHashMap.Builder<>()
+            .weakKeys().strongValues().get();
+
     private final WasmListAccessor listAccessor;
     private final WasmObject wasmList;
     private final IntFunction<Item_> itemFromPointer;
@@ -36,17 +44,24 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
         }
     }
 
-    private WasmList(WasmListAccessor listAccessor, WasmObject wasmList, IntFunction<Item_> itemFromPointer) {
-        this.listAccessor = listAccessor;
-        this.wasmList = wasmList;
-        this.itemFromPointer = itemFromPointer;
-        cachedSize = 0;
+    private WasmList(int wasmListPointer, Class<Item_> itemClass) {
+        this(SolverResource.LIST_ACCESSOR.get(), WasmObject.ofExisting(
+                SolverResource.LIST_ACCESSOR.get().getWasmInstance(), wasmListPointer
+        ), itemClass);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <Item_ extends WasmObject> WasmList<Item_> ofExisting(int memoryPointer, Class<Item_> itemClass) {
+        if (memoryPointer == 0) {
+            return null;
+        }
+        return (WasmList<Item_>) wasmInstanceToListCache.computeIfAbsent(SolverResource.LIST_ACCESSOR.get().getWasmInstance(), ignored -> new HashMap<>())
+                .computeIfAbsent(memoryPointer, ignored -> new WasmList<>(memoryPointer, itemClass));
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Item_ get(int index) {
-        return (Item_) listAccessor.getItem(wasmList, index);
+        return listAccessor.getItem(wasmList, index, itemFromPointer);
     }
 
     @Override
@@ -80,8 +95,7 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
         return old;
     }
 
-    @Override
-    public WasmList<Item_> createNewInstance() {
-        return new WasmList<>(listAccessor, listAccessor.newInstance(), itemFromPointer);
+    public int getMemoryAddress() {
+        return wasmList.memoryPointer;
     }
 }

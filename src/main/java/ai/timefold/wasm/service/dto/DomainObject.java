@@ -15,20 +15,9 @@ public class DomainObject {
     @Nullable
     DomainObjectMapper domainObjectMapper;
 
-    public DomainObject(String name, Map<String, FieldDescriptor> fieldDescriptorMap) {
-        this.name = name;
-        this.fieldDescriptorMap = fieldDescriptorMap;
-    }
-
-    public DomainObject(Map<String, FieldDescriptor> fieldDescriptorMap) {
-        this.name = null;
-        this.fieldDescriptorMap = fieldDescriptorMap;
-        this.domainObjectMapper = null;
-    }
-
     @JsonCreator
     public DomainObject(@JsonProperty("fields") Map<String, FieldDescriptor> fieldDescriptorMap,
-            @JsonProperty("mapper") DomainObjectMapper domainObjectMapper) {
+            @JsonProperty("mapper") @Nullable DomainObjectMapper domainObjectMapper) {
         this.name = null;
         this.fieldDescriptorMap = fieldDescriptorMap;
         this.domainObjectMapper = domainObjectMapper;

@@ -30,22 +30,28 @@ public class PlanningProblemDeserializationTest {
 
     @Test
     public void testDeserialize() throws IOException {
-        var employee = new DomainObject("Employee",
+        var employee = new DomainObject(
                 Map.of(
                         "name", new FieldDescriptor("String", null)
-                ));
-        var shift = new DomainObject("Shift",
+                ), null);
+        employee.setName("Employee");
+
+        var shift = new DomainObject(
                 Map.of(
                         "start", new FieldDescriptor("int", null),
                         "end", new FieldDescriptor("int", null),
-                        "employee", new FieldDescriptor("Employee", List.of(new DomainPlanningVariable(true)))
-                ));
-        var schedule = new DomainObject("Schedule",
+                        "employee", new FieldDescriptor("Employee", new DomainAccessor("getEmployee", "setEmployee"), List.of(new DomainPlanningVariable(true)))
+                ), null);
+        shift.setName("Shift");
+
+        var schedule = new DomainObject(
                 Map.of(
-                        "employees", new FieldDescriptor("Employee[]", List.of(new DomainProblemFactCollectionProperty(), new DomainValueRangeProvider())),
-                        "shifts", new FieldDescriptor("Shift[]", List.of(new DomainPlanningEntityCollectionProperty())),
+                        "employees", new FieldDescriptor("Employee[]", new DomainAccessor("getEmployees", "setEmployees"), List.of(new DomainProblemFactCollectionProperty(), new DomainValueRangeProvider())),
+                        "shifts", new FieldDescriptor("Shift[]", new DomainAccessor("getShifts", "setShifts"), List.of(new DomainPlanningEntityCollectionProperty())),
                         "score", new FieldDescriptor("SimpleScore", List.of(new DomainPlanningScore()))
-                ));
+                ), new DomainObjectMapper("strToSchedule", "scheduleToStr"));
+        schedule.setName("Schedule");
+
         var penalties = List.of(
                 new WasmConstraint("penalize unassigned",
                         "1",
@@ -61,16 +67,6 @@ public class PlanningProblemDeserializationTest {
                                 new ForEachComponent("Shift"),
                                 new FilterComponent(new WasmFunction("requestedTimeOff"))
                         ))
-        );
-        var input = Map.<String, Object>of(
-                "employees", List.of(
-                        Map.of("name", "Ann"),
-                        Map.of("name", "Beth")
-                ),
-                "shifts", List.of(
-                        Map.of("start", 1, "end", 2),
-                        Map.of("start", 3, "end", 4)
-                )
         );
         var expected = new PlanningProblem(
                 Map.of(
@@ -92,7 +88,7 @@ public class PlanningProblemDeserializationTest {
                         "insert",
                         "remove"
                 ),
-                input
+                "abcd"
         );
         assertThat((Object) objectMapper.readerFor(PlanningProblem.class).readValue(
                    """
@@ -107,6 +103,7 @@ public class PlanningProblemDeserializationTest {
                                    "end": {"type": "int"},
                                    "employee": {
                                        "type": "Employee",
+                                       "accessor": {"getter": "getEmployee", "setter": "setEmployee"},
                                        "annotations": [{"annotation": "PlanningVariable", "allowsUnassigned": true}]
                                    }
                                }
@@ -115,6 +112,7 @@ public class PlanningProblemDeserializationTest {
                                "fields": {
                                    "employees": {
                                        "type": "Employee[]",
+                                       "accessor": {"getter": "getEmployees", "setter": "setEmployees"},
                                        "annotations": [
                                            {"annotation": "ProblemFactCollectionProperty"},
                                            {"annotation": "ValueRangeProvider"}
@@ -122,6 +120,7 @@ public class PlanningProblemDeserializationTest {
                                    },
                                    "shifts": {
                                        "type": "Shift[]",
+                                       "accessor": {"getter": "getShifts", "setter": "setShifts"},
                                        "annotations": [
                                            {"annotation": "PlanningEntityCollectionProperty"}
                                        ]
@@ -132,7 +131,8 @@ public class PlanningProblemDeserializationTest {
                                            {"annotation": "PlanningScore"}
                                        ]
                                    }
-                               }
+                               },
+                               "mapper": {"fromString": "strToSchedule", "toString": "scheduleToStr"}
                            }
                        },
                        "penalize": [
@@ -167,15 +167,7 @@ public class PlanningProblemDeserializationTest {
                            "insert": "insert",
                            "remove": "remove"
                        },
-                       "problem": {
-                           "employees": [
-                               {"name": "Ann"}, {"name": "Beth"}
-                           ],
-                           "shifts": [
-                               {"start": 1, "end": 2},
-                               {"start": 3, "end": 4}
-                           ]
-                       }
+                       "problem": "abcd"
                    }
                    """.formatted(
                            Base64.getEncoder().encodeToString(new byte[] {1, 2, 3})

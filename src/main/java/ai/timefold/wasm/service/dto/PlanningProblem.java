@@ -35,7 +35,7 @@ public class PlanningProblem {
 
     DomainListAccessor listAccessor;
 
-    Map<String, Object> problem;
+    String problem;
 
     @JsonCreator
     public PlanningProblem(@JsonProperty("domain")  Map<String, DomainObject> domainObjectMap,
@@ -45,7 +45,7 @@ public class PlanningProblem {
             @JsonProperty("allocator") String allocator,
             @JsonProperty("deallocator") String deallocator,
             @JsonProperty("listAccessor")  DomainListAccessor listAccessor,
-            @JsonProperty("problem") Map<String, Object> problem) {
+            @JsonProperty("problem") String problem) {
         this.domainObjectMap = domainObjectMap;
         this.penaltyConstraintList = penaltyConstraintList;
         this.rewardConstraintList = rewardConstraintList;
@@ -107,7 +107,7 @@ public class PlanningProblem {
         return rewardConstraintList;
     }
 
-    public Map<String, Object> getProblem() {
+    public String getProblem() {
         return problem;
     }
 
