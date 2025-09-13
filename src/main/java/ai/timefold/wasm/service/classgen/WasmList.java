@@ -2,7 +2,9 @@ package ai.timefold.wasm.service.classgen;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.AbstractList;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.IntFunction;
 
@@ -22,12 +24,14 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
     private final IntFunction<Item_> itemFromPointer;
 
     private int cachedSize;
+    private List<Item_> cachedItemList;
 
     public WasmList(WasmListAccessor listAccessor, WasmObject wasmList,
             Class<Item_> itemClass) {
         this.listAccessor = listAccessor;
         this.wasmList = wasmList;
         cachedSize = listAccessor.getLength(wasmList);
+        cachedItemList = new ArrayList<>(cachedSize);
 
         var wasmInstance = listAccessor.getWasmInstance();
         try {
@@ -41,6 +45,10 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
             };
         } catch (NoSuchMethodException e) {
             throw new RuntimeException(e);
+        }
+
+        for (int i = 0; i < cachedSize; i++) {
+            cachedItemList.add(listAccessor.getItem(wasmList, i, itemFromPointer));
         }
     }
 
@@ -61,7 +69,7 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
 
     @Override
     public Item_ get(int index) {
-        return listAccessor.getItem(wasmList, index, itemFromPointer);
+        return cachedItemList.get(index);
     }
 
     @Override
@@ -69,6 +77,7 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
     public Item_ set(int index, Item_ element) {
         var old = get(index);
         listAccessor.setItem(wasmList, index, element);
+        cachedItemList.set(index, element);
         return old;
     }
 
@@ -81,8 +90,10 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
     public void add(int index, Item_ element) {
         if (index == cachedSize) {
             listAccessor.append(wasmList, element);
+            cachedItemList.add(element);
         } else {
             listAccessor.insert(wasmList, index, element);
+            cachedItemList.add(index, element);
         }
         cachedSize++;
     }
@@ -91,6 +102,7 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
     public Item_ remove(int index) {
         var old = get(index);
         listAccessor.remove(wasmList, index);
+        cachedItemList.remove(index);
         cachedSize--;
         return old;
     }

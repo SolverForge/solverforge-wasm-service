@@ -5,7 +5,11 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
+import ai.timefold.solver.core.config.solver.termination.DiminishedReturnsTerminationConfig;
+import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
+
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -37,6 +41,9 @@ public class PlanningProblem {
 
     String problem;
 
+    @JsonProperty("termination")
+    PlanningTermination terminationConfig;
+
     @JsonCreator
     public PlanningProblem(@JsonProperty("domain")  Map<String, DomainObject> domainObjectMap,
             @JsonProperty("penalty") List<WasmConstraint> penaltyConstraintList,
@@ -45,7 +52,8 @@ public class PlanningProblem {
             @JsonProperty("allocator") String allocator,
             @JsonProperty("deallocator") String deallocator,
             @JsonProperty("listAccessor")  DomainListAccessor listAccessor,
-            @JsonProperty("problem") String problem) {
+            @JsonProperty("problem") String problem,
+            @Nullable @JsonProperty("termination") PlanningTermination terminationConfig) {
         this.domainObjectMap = domainObjectMap;
         this.penaltyConstraintList = penaltyConstraintList;
         this.rewardConstraintList = rewardConstraintList;
@@ -54,6 +62,7 @@ public class PlanningProblem {
         this.allocator = allocator;
         this.deallocator = deallocator;
         this.listAccessor = listAccessor;
+        this.terminationConfig = (terminationConfig != null)? terminationConfig : new PlanningTermination().withDiminishedReturns(new PlanningDiminishedReturns());
 
         entityClassList = new ArrayList<>();
         for (var entry : domainObjectMap.entrySet()) {
@@ -125,5 +134,9 @@ public class PlanningProblem {
 
     public DomainListAccessor getListAccessor() {
         return listAccessor;
+    }
+
+    public TerminationConfig terminationConfig() {
+        return terminationConfig.asTerminationConfig();
     }
 }

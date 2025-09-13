@@ -21,11 +21,14 @@ import ai.timefold.wasm.service.dto.PlanningProblem;
 import ai.timefold.wasm.service.dto.SolveResult;
 
 import com.dylibso.chicory.compiler.MachineFactoryCompiler;
+import com.dylibso.chicory.log.SystemLogger;
 import com.dylibso.chicory.runtime.ByteArrayMemory;
 import com.dylibso.chicory.runtime.HostFunction;
 import com.dylibso.chicory.runtime.ImportFunction;
 import com.dylibso.chicory.runtime.ImportValues;
 import com.dylibso.chicory.runtime.Instance;
+import com.dylibso.chicory.wasi.WasiOptions;
+import com.dylibso.chicory.wasi.WasiPreview1;
 import com.dylibso.chicory.wasm.Parser;
 
 @Path("/solver")
@@ -70,7 +73,7 @@ public class SolverResource {
                     .defineConstraintProviderClass(planningProblem);
             solverConfig.withConstraintProviderClass(constraintProviderClass);
 
-            solverConfig.withTerminationConfig(new TerminationConfig().withSecondsSpentLimit(1L));
+            solverConfig.withTerminationConfig(planningProblem.terminationConfig());
 
             var solverFactory = SolverFactory.create(solverConfig);
             var solver = solverFactory.buildSolver();
@@ -98,14 +101,23 @@ public class SolverResource {
                 .withMemoryFactory(ByteArrayMemory::new)
                 .withMachineFactory(MachineFactoryCompiler::compile);
 
-        if (!hostFunctionList.isEmpty()) {
-            var importFunctions = new ImportFunction[hostFunctionList.size()];
-            for (int i = 0; i < importFunctions.length; i++) {
-                importFunctions[i] = hostFunctionList.get(i);
-            }
-            instanceBuilder.withImportValues(ImportValues.builder()
-                    .addFunction(importFunctions).build());
+        // let's just use the default options for now
+        var options = WasiOptions.builder()
+                .inheritSystem()
+                .build();
+        // create our instance of wasip1
+        var wasi = WasiPreview1.builder().withOptions(options).build();
+
+        var importFunctions = new ImportFunction[hostFunctionList.size()];
+        for (int i = 0; i < importFunctions.length; i++) {
+            importFunctions[i] = hostFunctionList.get(i);
         }
+        instanceBuilder.withImportValues(ImportValues.builder()
+                .addFunction(importFunctions)
+                .addFunction(wasi.toHostFunctions())
+                .build());
+
+
         var out = instanceBuilder.build();
         out.initialize(true);
         return out;

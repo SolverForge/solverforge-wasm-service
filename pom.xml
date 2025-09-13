@@ -48,6 +48,12 @@
     </dependency>
 
     <dependency>
+      <groupId>ai.timefold.solver</groupId>
+      <artifactId>timefold-solver-quarkus-jackson</artifactId>
+      <version>${timefold.version}</version>
+    </dependency>
+
+    <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-collections4</artifactId>
       <version>${apache.collections.version}</version>
@@ -62,6 +68,11 @@
     <dependency>
       <groupId>com.dylibso.chicory</groupId>
       <artifactId>wabt</artifactId>
+      <version>${chicory.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.dylibso.chicory</groupId>
+      <artifactId>wasi</artifactId>
       <version>${chicory.version}</version>
     </dependency>
 

@@ -40,7 +40,7 @@ public class PlanningProblemDeserializationTest {
                 Map.of(
                         "start", new FieldDescriptor("int", null),
                         "end", new FieldDescriptor("int", null),
-                        "employee", new FieldDescriptor("Employee", new DomainAccessor("getEmployee", "setEmployee"), List.of(new DomainPlanningVariable(true)))
+                        "employee", new FieldDescriptor("Employee", new DomainAccessor("getEmployee", "setEmployee"), List.of(new DomainPlanningVariable(false)))
                 ), null);
         shift.setName("Shift");
 
@@ -88,7 +88,8 @@ public class PlanningProblemDeserializationTest {
                         "insert",
                         "remove"
                 ),
-                "abcd"
+                "abcd",
+                new PlanningTermination().withSpentLimit("1s")
         );
         assertThat((Object) objectMapper.readerFor(PlanningProblem.class).readValue(
                    """
@@ -167,7 +168,8 @@ public class PlanningProblemDeserializationTest {
                            "insert": "insert",
                            "remove": "remove"
                        },
-                       "problem": "abcd"
+                       "problem": "abcd",
+                       "termination": {"spentLimit": "1s"}
                    }
                    """.formatted(
                            Base64.getEncoder().encodeToString(new byte[] {1, 2, 3})

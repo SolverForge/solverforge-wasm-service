@@ -14,7 +14,7 @@ public final class DomainPlanningVariable implements PlanningAnnotation {
 
     @JsonCreator
     public DomainPlanningVariable() {
-        this.allowsUnassigned = true;
+        this.allowsUnassigned = false;
     }
 
     @JsonCreator

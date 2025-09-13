@@ -1,5 +1,7 @@
 package ai.timefold.wasm.service.classgen;
 
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.lang.classfile.Annotation;
 import java.lang.classfile.AnnotationElement;
 import java.lang.classfile.AnnotationValue;
@@ -15,6 +17,7 @@ import java.lang.constant.MethodTypeDesc;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -118,6 +121,12 @@ public class DomainObjectClassGenerator {
         return new WasmOffsets(totalSize, Collections.unmodifiableMap(nameToMemoryOffset));
     }
 
+    private static void debug(CodeBuilder codeBuilder, ClassDesc typeDesc) {
+        codeBuilder.getstatic(getDescriptor(System.class), "out", getDescriptor(PrintStream.class));
+        codeBuilder.swap();
+        codeBuilder.invokevirtual(getDescriptor(PrintStream.class), "println", MethodTypeDesc.of(voidDesc, typeDesc));
+    }
+
     private static void readWasmField(CodeBuilder codeBuilder, int offset, String type) {
         codeBuilder.aload(0);
         codeBuilder.loadConstant(offset);
@@ -205,7 +214,7 @@ public class DomainObjectClassGenerator {
                     codeBuilder.loadConstant(domainObjectMapper.stringToInstanceFunction());
                     codeBuilder.invokevirtual(instanceDesc, "export", MethodTypeDesc.of(getDescriptor(ExportFunction.class), stringDesc));
 
-                    // pointer = allocator.allocate(str.getBytes().length);
+                    // pointer = allocator.allocate(str.getBytes().length + 1);
                     var STRING_LENGTH_LOCAL = 4;
                     var POINTER_LOCAL = 5;
                     codeBuilder.aload(1);
@@ -214,15 +223,17 @@ public class DomainObjectClassGenerator {
                     codeBuilder.arraylength();
                     codeBuilder.storeLocal(TypeKind.INT, STRING_LENGTH_LOCAL);
                     codeBuilder.loadLocal(TypeKind.INT, STRING_LENGTH_LOCAL);
+                    codeBuilder.iconst_1();
+                    codeBuilder.iadd();
                     codeBuilder.invokevirtual(allocatorDesc, "allocate", MethodTypeDesc.of(intDesc, intDesc));
                     codeBuilder.storeLocal(TypeKind.INT, POINTER_LOCAL);
 
-                    // instance.memory().writeString(text, pointer);
+                    // instance.memory().writeCString(text, pointer);
                     codeBuilder.aload(2);
                     codeBuilder.invokevirtual(instanceDesc, "memory",  MethodTypeDesc.of(getDescriptor(Memory.class)));
                     codeBuilder.loadLocal(TypeKind.INT, POINTER_LOCAL);
                     codeBuilder.aload(3);
-                    codeBuilder.invokeinterface(getDescriptor(Memory.class), "writeString", MethodTypeDesc.of(voidDesc, intDesc, stringDesc));
+                    codeBuilder.invokeinterface(getDescriptor(Memory.class), "writeCString", MethodTypeDesc.of(voidDesc, intDesc, stringDesc));
 
                     // long[] temp = new long[] {size, pointer};
                     codeBuilder.loadConstant(2);
@@ -244,6 +255,10 @@ public class DomainObjectClassGenerator {
                     codeBuilder.loadConstant(0);
                     codeBuilder.laload();
                     codeBuilder.l2i();
+
+                    codeBuilder.aload(1);
+                    codeBuilder.iload(POINTER_LOCAL);
+                    codeBuilder.invokevirtual(allocatorDesc, "free", MethodTypeDesc.of(voidDesc, intDesc));
 
                     codeBuilder.invokespecial(wasmObjectDesc, "<init>", MethodTypeDesc.of(voidDesc, instanceDesc, intDesc));
                     codeBuilder.return_();
@@ -289,15 +304,18 @@ public class DomainObjectClassGenerator {
                                 if (finalIsPlanningScore) {
                                     codeBuilder.aload(0);
                                     codeBuilder.getfield(ClassDesc.of(domainObject.getName()), field.getKey(), typeDesc);
+                                    codeBuilder.return_(getTypeKind(field.getValue().getType()));
                                 } else {
                                     if (field.getValue().getAccessor() != null) {
                                         readWasmFieldUsingAccessor(field.getValue(), codeBuilder);
+                                        codeBuilder.return_(getTypeKind(field.getValue().getType()));
                                     } else {
-                                        var offset = wasmOffsets.nameToMemoryOffset.get(field.getKey());
-                                        readWasmField(codeBuilder, offset, field.getValue().getType());
+                                        codeBuilder.new_(getDescriptor(UnsupportedOperationException.class));
+                                        codeBuilder.dup();
+                                        codeBuilder.invokespecial(getDescriptor(UnsupportedOperationException.class), "<init>", MethodTypeDesc.of(voidDesc));
+                                        codeBuilder.athrow();
                                     }
                                 }
-                                codeBuilder.return_(getTypeKind(field.getValue().getType()));
                             });
                         });
 
@@ -308,14 +326,20 @@ public class DomainObjectClassGenerator {
                                     codeBuilder.aload(0);
                                     codeBuilder.aload(1);
                                     codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), typeDesc);
+                                    codeBuilder.return_();
                                 } else {
                                     if (field.getValue().getAccessor() != null) {
                                         writeWasmFieldUsingAccessor(field.getValue(), codeBuilder, valueBuilder -> {
                                             valueBuilder.aload(1);
                                         });
+                                        codeBuilder.return_();
+                                    }else {
+                                        codeBuilder.new_(getDescriptor(UnsupportedOperationException.class));
+                                        codeBuilder.dup();
+                                        codeBuilder.invokespecial(getDescriptor(UnsupportedOperationException.class), "<init>", MethodTypeDesc.of(voidDesc));
+                                        codeBuilder.athrow();
                                     }
                                 }
-                                codeBuilder.return_();
                             });
             }
             if (isPlanningEntity && isPlanningSolution) {
@@ -351,23 +375,24 @@ public class DomainObjectClassGenerator {
                     codeBuilder.lastore();
 
                     codeBuilder.invokeinterface(getDescriptor(ExportFunction.class), "apply", MethodTypeDesc.of(longDesc.arrayType(), longDesc.arrayType()));
-                    codeBuilder.dup();
 
-                    codeBuilder.loadConstant(1);
-                    codeBuilder.laload();
-                    codeBuilder.l2i();
-
-                    codeBuilder.swap();
                     codeBuilder.loadConstant(0);
                     codeBuilder.laload();
                     codeBuilder.l2i();
+                    codeBuilder.dup();
 
                     codeBuilder.aload(0);
                     codeBuilder.getfield(wasmObjectDesc, "wasmInstance", instanceDesc);
                     codeBuilder.invokevirtual(instanceDesc, "memory", MethodTypeDesc.of(getDescriptor(Memory.class)));
-                    codeBuilder.dup_x2();
-                    codeBuilder.pop();
-                    codeBuilder.invokeinterface(getDescriptor(Memory.class), "readString", MethodTypeDesc.of(stringDesc, intDesc, intDesc));
+                    codeBuilder.swap();
+                    codeBuilder.invokeinterface(getDescriptor(Memory.class), "readCString", MethodTypeDesc.of(stringDesc, intDesc));
+
+                    codeBuilder.swap();
+                    codeBuilder.getstatic(getDescriptor(SolverResource.class), "ALLOCATOR", getDescriptor(ThreadLocal.class));
+                    codeBuilder.invokevirtual(getDescriptor(ThreadLocal.class), "get", MethodTypeDesc.of(objectDesc));
+                    codeBuilder.checkcast(allocatorDesc);
+                    codeBuilder.swap();
+                    codeBuilder.invokevirtual(allocatorDesc, "free", MethodTypeDesc.of(voidDesc, intDesc));
 
                     codeBuilder.return_(TypeKind.REFERENCE);
                 });

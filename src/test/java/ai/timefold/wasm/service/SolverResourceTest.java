@@ -10,12 +10,14 @@ import java.util.Map;
 import jakarta.inject.Inject;
 
 import ai.timefold.solver.core.api.score.buildin.simple.SimpleScore;
+import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
 import ai.timefold.wasm.service.dto.DomainAccessor;
 import ai.timefold.wasm.service.dto.DomainListAccessor;
 import ai.timefold.wasm.service.dto.DomainObject;
 import ai.timefold.wasm.service.dto.DomainObjectMapper;
 import ai.timefold.wasm.service.dto.FieldDescriptor;
 import ai.timefold.wasm.service.dto.PlanningProblem;
+import ai.timefold.wasm.service.dto.PlanningTermination;
 import ai.timefold.wasm.service.dto.WasmConstraint;
 import ai.timefold.wasm.service.dto.WasmFunction;
 import ai.timefold.wasm.service.dto.annotation.DomainPlanningEntityCollectionProperty;
@@ -102,7 +104,7 @@ public class SolverResourceTest {
                             }
                         }),
                 new HostFunction("host", "hscheduleString",
-                        FunctionType.of(List.of(ValType.I32), List.of(ValType.I32, ValType.I32)),
+                        FunctionType.of(List.of(ValType.I32), List.of(ValType.I32)),
                         (instance, args) -> {
                             var schedule = (int) args[0];
                             var alloc = instance.export("alloc");
@@ -156,9 +158,9 @@ public class SolverResourceTest {
                             }
                             out.append("]}");
                             var outString = out.toString();
-                            var memoryString = (int) alloc.apply(outString.getBytes().length)[0];
-                            instance.memory().writeString(memoryString, outString);
-                            return new long[] {outString.length(), memoryString};
+                            var memoryString = (int) alloc.apply(outString.getBytes().length + 1)[0];
+                            instance.memory().writeCString(memoryString, outString);
+                            return new long[] {memoryString};
                         }),
                 new HostFunction("host", "hnewList",
                         FunctionType.of(List.of(), List.of(ValType.I32)),
@@ -281,7 +283,7 @@ public class SolverResourceTest {
                             (type (;2;) (func (param i32 i32) (result i32)))
                             (type (;3;) (func (param i32 i32 i32)))
                             (type (;4;) (func (param i32 i32)))
-                            (type (;5;) (func (param i32) (result i32 i32)))
+                            (type (;5;) (func (param i32) (result i32)))
                             (import "host" "hparseSchedule" (func $hparseSchedule (type 2)))
                             (import "host" "hscheduleString" (func $hscheduleString (type 5)))
                             (import "host" "hnewList" (func $hnewList (type 1)))
@@ -295,7 +297,7 @@ public class SolverResourceTest {
                             (func (export "parseSchedule") (param $length i32) (param $schedule i32) (result i32)
                                 (local.get $length) (local.get $schedule) (call $hparseSchedule)
                             )
-                            (func (export "scheduleString") (param $schedule i32) (result i32 i32)
+                            (func (export "scheduleString") (param $schedule i32) (result i32)
                                 (local.get $schedule) (call $hscheduleString)
                             )
                             (func (export "newList") (result i32)
@@ -364,7 +366,7 @@ public class SolverResourceTest {
                 ),
                 """
                 {"employees": [{"id": 0}, {"id": 1}], "shifts": [{}, {}]}
-                """
+                """, new PlanningTermination("1s", null, null, null, null, null, null, null, null)
         );
         var out = solverResource.solve(planningProblem);
         var solution = (Map) objectMapper.readerFor(Map.class).readValue(out.solution());
