@@ -5,7 +5,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
-import ai.timefold.solver.core.config.solver.termination.DiminishedReturnsTerminationConfig;
+import ai.timefold.solver.core.config.solver.EnvironmentMode;
 import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
 
 import org.jspecify.annotations.NullMarked;
@@ -25,11 +25,10 @@ public class PlanningProblem {
     @JsonIgnore
     List<String> entityClassList;
 
-    @JsonProperty("penalize")
-    List<WasmConstraint> penaltyConstraintList;
+    @JsonProperty("constraints")
+    List<WasmConstraint> constraintList;
 
-    @JsonProperty("reward")
-    List<WasmConstraint> rewardConstraintList;
+    EnvironmentMode environmentMode;
 
     byte[] wasm;
 
@@ -46,8 +45,8 @@ public class PlanningProblem {
 
     @JsonCreator
     public PlanningProblem(@JsonProperty("domain")  Map<String, DomainObject> domainObjectMap,
-            @JsonProperty("penalty") List<WasmConstraint> penaltyConstraintList,
-            @JsonProperty("reward") List<WasmConstraint> rewardConstraintList,
+            @JsonProperty("constraints") Map<String, WasmConstraint> constraintList,
+            @Nullable@JsonProperty("environmentMode") EnvironmentMode environmentMode,
             @JsonProperty("wasm") String wasm,
             @JsonProperty("allocator") String allocator,
             @JsonProperty("deallocator") String deallocator,
@@ -55,8 +54,13 @@ public class PlanningProblem {
             @JsonProperty("problem") String problem,
             @Nullable @JsonProperty("termination") PlanningTermination terminationConfig) {
         this.domainObjectMap = domainObjectMap;
-        this.penaltyConstraintList = penaltyConstraintList;
-        this.rewardConstraintList = rewardConstraintList;
+        this.constraintList = constraintList.entrySet()
+                .stream()
+                .map(entry -> {
+                    entry.getValue().name = entry.getKey();
+                    return entry.getValue();
+                }).toList();
+        this.environmentMode = (environmentMode != null)? environmentMode : EnvironmentMode.PHASE_ASSERT;
         this.problem = problem;
         this.wasm = Base64.getDecoder().decode(wasm);
         this.allocator = allocator;
@@ -108,12 +112,8 @@ public class PlanningProblem {
         return entityClassList;
     }
 
-    public List<WasmConstraint> getPenaltyConstraintList() {
-        return penaltyConstraintList;
-    }
-
-    public List<WasmConstraint> getRewardConstraintList() {
-        return rewardConstraintList;
+    public List<WasmConstraint> getConstraintList() {
+        return constraintList;
     }
 
     public String getProblem() {
@@ -138,5 +138,9 @@ public class PlanningProblem {
 
     public TerminationConfig terminationConfig() {
         return terminationConfig.asTerminationConfig();
+    }
+
+    public EnvironmentMode getEnvironmentMode() {
+        return environmentMode;
     }
 }

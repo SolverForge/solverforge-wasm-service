@@ -68,8 +68,9 @@ public class SolverResource {
 
             solverConfig.setSolutionClass(solutionClass);
             solverConfig.setEntityClassList(entityClassList);
+            solverConfig.setEnvironmentMode(planningProblem.getEnvironmentMode());
 
-            var constraintProviderClass = new ConstraintProviderClassGenerator(domainObjectClassGenerator, wasmInstance)
+            var constraintProviderClass = new ConstraintProviderClassGenerator()
                     .defineConstraintProviderClass(planningProblem);
             solverConfig.withConstraintProviderClass(constraintProviderClass);
 

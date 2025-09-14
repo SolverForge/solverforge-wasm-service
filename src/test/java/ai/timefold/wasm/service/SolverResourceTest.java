@@ -10,6 +10,7 @@ import java.util.Map;
 import jakarta.inject.Inject;
 
 import ai.timefold.solver.core.api.score.buildin.simple.SimpleScore;
+import ai.timefold.solver.core.config.solver.EnvironmentMode;
 import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
 import ai.timefold.wasm.service.dto.DomainAccessor;
 import ai.timefold.wasm.service.dto.DomainListAccessor;
@@ -28,6 +29,7 @@ import ai.timefold.wasm.service.dto.annotation.DomainValueRangeProvider;
 import ai.timefold.wasm.service.dto.constraint.FilterComponent;
 import ai.timefold.wasm.service.dto.constraint.ForEachComponent;
 import ai.timefold.wasm.service.dto.constraint.JoinComponent;
+import ai.timefold.wasm.service.dto.constraint.PenalizeComponent;
 
 import org.junit.jupiter.api.Test;
 
@@ -260,21 +262,16 @@ public class SolverResourceTest {
                                         "score", new  FieldDescriptor("SimpleScore", List.of(new DomainPlanningScore()))
                         ),new DomainObjectMapper("parseSchedule", "scheduleString"))
                         ),
-                // List.of(),
-                // penalize
-                List.of(
-                        new WasmConstraint(
-                                "penalizeId0",
-                                "1",
+                Map.of(
+                        "penalizeId0", new WasmConstraint(
                                 List.of(
                                       new ForEachComponent("Shift"),
                                       new JoinComponent("Employee"),
-                                      new FilterComponent(new WasmFunction("isEmployeeId0"))
+                                      new FilterComponent(new WasmFunction("isEmployeeId0")),
+                                      new PenalizeComponent("1", null))
                                 )
-                        )
                 ),
-                //reward
-                List.of(),
+                EnvironmentMode.FULL_ASSERT,
                 Base64.getEncoder().encodeToString(Wat2Wasm.parse(
                         """
                         (module

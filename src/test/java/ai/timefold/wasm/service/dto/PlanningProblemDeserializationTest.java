@@ -9,6 +9,7 @@ import java.util.Map;
 
 import jakarta.inject.Inject;
 
+import ai.timefold.solver.core.config.solver.EnvironmentMode;
 import ai.timefold.wasm.service.dto.annotation.DomainPlanningEntityCollectionProperty;
 import ai.timefold.wasm.service.dto.annotation.DomainPlanningScore;
 import ai.timefold.wasm.service.dto.annotation.DomainPlanningVariable;
@@ -16,6 +17,8 @@ import ai.timefold.wasm.service.dto.annotation.DomainProblemFactCollectionProper
 import ai.timefold.wasm.service.dto.annotation.DomainValueRangeProvider;
 import ai.timefold.wasm.service.dto.constraint.FilterComponent;
 import ai.timefold.wasm.service.dto.constraint.ForEachComponent;
+import ai.timefold.wasm.service.dto.constraint.PenalizeComponent;
+import ai.timefold.wasm.service.dto.constraint.RewardComponent;
 
 import org.junit.jupiter.api.Test;
 
@@ -52,20 +55,18 @@ public class PlanningProblemDeserializationTest {
                 ), new DomainObjectMapper("strToSchedule", "scheduleToStr"));
         schedule.setName("Schedule");
 
-        var penalties = List.of(
-                new WasmConstraint("penalize unassigned",
-                        "1",
+        var constraints = Map.of(
+                "penalize unassigned", new WasmConstraint(
                         List.of(
                                 new ForEachComponent("Shift"),
-                                new FilterComponent(new WasmFunction("unassigned"))
-                        ))
-        );
-        var rewards = List.of(
-                new WasmConstraint("reward requested time off",
-                        "2",
+                                new FilterComponent(new WasmFunction("unassigned")),
+                                new PenalizeComponent("1", null)
+                        )),
+                "reward requested time off", new WasmConstraint(
                         List.of(
                                 new ForEachComponent("Shift"),
-                                new FilterComponent(new WasmFunction("requestedTimeOff"))
+                                new FilterComponent(new WasmFunction("requestedTimeOff")),
+                                new RewardComponent("2", null)
                         ))
         );
         var expected = new PlanningProblem(
@@ -74,8 +75,8 @@ public class PlanningProblemDeserializationTest {
                         "Shift", shift,
                         "Schedule", schedule
                 ),
-                penalties,
-                rewards,
+                constraints,
+                EnvironmentMode.FULL_ASSERT,
                 Base64.getEncoder().encodeToString(new byte[] {1, 2, 3}),
                 "alloc",
                 "dealloc",
@@ -136,26 +137,18 @@ public class PlanningProblemDeserializationTest {
                                "mapper": {"fromString": "strToSchedule", "toString": "scheduleToStr"}
                            }
                        },
-                       "penalize": [
-                           {
-                               "name": "penalize unassigned",
-                               "weight": "1",
-                               "match": [
-                                   {"kind": "each", "className": "Shift"},
-                                   {"kind": "filter", "functionName": "unassigned"}
-                               ]
-                           }
-                       ],
-                       "reward": [
-                           {
-                               "name": "reward requested time off",
-                               "weight": "2",
-                               "match": [
-                                   {"kind": "each", "className": "Shift"},
-                                   {"kind": "filter", "functionName": "requestedTimeOff"}
-                               ]
-                           }
-                       ],
+                       "constraints": {
+                           "penalize unassigned": [
+                               {"kind": "each", "className": "Shift"},
+                               {"kind": "filter", "functionName": "unassigned"},
+                               {"kind": "penalize", "weight": "1"}
+                           ],
+                           "reward requested time off": [
+                               {"kind": "each", "className": "Shift"},
+                               {"kind": "filter", "functionName": "requestedTimeOff"},
+                               {"kind": "reward", "weight": "2"}
+                           ]
+                       },
                        "wasm": "%s",
                        "allocator": "alloc",
                        "deallocator": "dealloc",
@@ -169,12 +162,14 @@ public class PlanningProblemDeserializationTest {
                            "remove": "remove"
                        },
                        "problem": "abcd",
+                       "environmentMode": "FULL_ASSERT",
                        "termination": {"spentLimit": "1s"}
                    }
                    """.formatted(
                            Base64.getEncoder().encodeToString(new byte[] {1, 2, 3})
                    )
         )).usingRecursiveComparison()
+          .ignoringCollectionOrderInFields("constraintList")
           .isEqualTo(expected);
     }
 }
