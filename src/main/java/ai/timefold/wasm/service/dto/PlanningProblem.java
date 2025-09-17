@@ -36,6 +36,8 @@ public class PlanningProblem {
 
     String deallocator;
 
+    String solutionDeallocator;
+
     DomainListAccessor listAccessor;
 
     String problem;
@@ -50,6 +52,7 @@ public class PlanningProblem {
             @JsonProperty("wasm") String wasm,
             @JsonProperty("allocator") String allocator,
             @JsonProperty("deallocator") String deallocator,
+            @Nullable @JsonProperty("solutionDeallocator") String solutionDeallocator,
             @JsonProperty("listAccessor")  DomainListAccessor listAccessor,
             @JsonProperty("problem") String problem,
             @Nullable @JsonProperty("termination") PlanningTermination terminationConfig) {
@@ -65,6 +68,7 @@ public class PlanningProblem {
         this.wasm = Base64.getDecoder().decode(wasm);
         this.allocator = allocator;
         this.deallocator = deallocator;
+        this.solutionDeallocator = (solutionDeallocator != null)? solutionDeallocator : deallocator;
         this.listAccessor = listAccessor;
         this.terminationConfig = (terminationConfig != null)? terminationConfig : new PlanningTermination().withDiminishedReturns(new PlanningDiminishedReturns());
 
@@ -130,6 +134,10 @@ public class PlanningProblem {
 
     public String getDeallocator() {
         return deallocator;
+    }
+
+    public String getSolutionDeallocator() {
+        return solutionDeallocator;
     }
 
     public DomainListAccessor getListAccessor() {

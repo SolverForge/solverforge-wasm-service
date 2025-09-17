@@ -80,6 +80,7 @@ public class PlanningProblemDeserializationTest {
                 Base64.getEncoder().encodeToString(new byte[] {1, 2, 3}),
                 "alloc",
                 "dealloc",
+                null,
                 new DomainListAccessor(
                         "newList",
                         "getItem",

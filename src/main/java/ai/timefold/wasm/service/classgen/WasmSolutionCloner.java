@@ -1,9 +1,11 @@
 package ai.timefold.wasm.service.classgen;
 
+import java.lang.ref.Cleaner;
 import java.lang.reflect.InvocationTargetException;
 
 import ai.timefold.solver.core.api.domain.solution.PlanningScore;
 import ai.timefold.solver.core.api.domain.solution.cloner.SolutionCloner;
+import ai.timefold.solver.core.api.solver.Solver;
 import ai.timefold.solver.core.impl.domain.common.ReflectionHelper;
 import ai.timefold.wasm.service.SolverResource;
 
@@ -12,13 +14,23 @@ import org.jspecify.annotations.NonNull;
 import com.dylibso.chicory.runtime.Instance;
 
 public class WasmSolutionCloner implements SolutionCloner<WasmObject> {
+    public static Cleaner solutionCleaner = Cleaner.create();
+
     @Override
     public @NonNull WasmObject cloneSolution(@NonNull WasmObject original) {
         var serialized = original.toString();
+        var allocator = SolverResource.ALLOCATOR.get();
+        var wasmInstance = SolverResource.INSTANCE.get();
+
         try {
             var solutionClass = original.getClass();
             var constructor = solutionClass.getConstructor(Allocator.class, Instance.class, String.class);
-            var out = constructor.newInstance(SolverResource.ALLOCATOR.get(), SolverResource.INSTANCE.get(), serialized);
+            var out = constructor.newInstance(allocator, wasmInstance, serialized);
+            var outMemoryLocation = out.getMemoryPointer();
+            solutionCleaner.register(out, () -> {
+                allocator.freeSolution(outMemoryLocation);
+            });
+
             for (var method : solutionClass.getMethods()) {
                 if (method.getAnnotation(PlanningScore.class) != null) {
                     var propertyName = method.getName().substring(3);

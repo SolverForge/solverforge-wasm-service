@@ -61,7 +61,8 @@ public class SolverResource {
             GENERATED_CLASS_LOADER.set(classLoader);
             INSTANCE.set(wasmInstance);
             LIST_ACCESSOR.set(new WasmListAccessor(wasmInstance, planningProblem.getListAccessor()));
-            ALLOCATOR.set(new Allocator(wasmInstance, planningProblem.getAllocator(), planningProblem.getDeallocator()));
+            ALLOCATOR.set(new Allocator(wasmInstance, planningProblem.getAllocator(), planningProblem.getDeallocator(),
+                    planningProblem.getSolutionDeallocator()));
 
             domainObjectClassGenerator.prepareClassesForPlanningProblem(planningProblem);
 

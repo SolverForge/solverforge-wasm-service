@@ -368,6 +368,7 @@ public class SolverResourceTest {
                         """)),
                 "alloc",
                 "dealloc",
+                null,
                 new DomainListAccessor(
                         "newList",
                         "getItem",
