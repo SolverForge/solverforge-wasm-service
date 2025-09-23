@@ -142,12 +142,12 @@ public class PlanningProblemDeserializationTest {
                        "constraints": {
                            "penalize unassigned": [
                                {"kind": "each", "className": "Shift"},
-                               {"kind": "filter", "functionName": "unassigned"},
+                               {"kind": "filter", "predicate": "unassigned"},
                                {"kind": "penalize", "weight": "1"}
                            ],
                            "reward requested time off": [
                                {"kind": "each", "className": "Shift"},
-                               {"kind": "filter", "functionName": "requestedTimeOff"},
+                               {"kind": "filter", "predicate": "requestedTimeOff"},
                                {"kind": "reward", "weight": "2"}
                            ]
                        },

@@ -29,9 +29,11 @@ import org.jspecify.annotations.Nullable;
 import com.dylibso.chicory.runtime.Instance;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
 
 @NullMarked
 public class WasmFunction {
+    @JsonValue
     final String wasmFunctionName;
 
     @Nullable
@@ -43,7 +45,7 @@ public class WasmFunction {
 
 
     @JsonCreator
-    public WasmFunction(@JsonProperty("functionName") String functionName) {
+    public WasmFunction(String functionName) {
         this.wasmFunctionName = functionName;
     }
 
