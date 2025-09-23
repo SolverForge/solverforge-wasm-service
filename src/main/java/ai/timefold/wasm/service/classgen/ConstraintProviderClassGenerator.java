@@ -8,6 +8,7 @@ import java.lang.classfile.constantpool.ConstantPoolBuilder;
 import java.lang.constant.ClassDesc;
 import java.lang.constant.MethodTypeDesc;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -19,12 +20,14 @@ import ai.timefold.solver.core.api.score.buildin.simple.SimpleScore;
 import ai.timefold.solver.core.api.score.stream.Constraint;
 import ai.timefold.solver.core.api.score.stream.ConstraintFactory;
 import ai.timefold.solver.core.api.score.stream.ConstraintProvider;
+import ai.timefold.solver.core.api.score.stream.uni.UniConstraintStream;
 import ai.timefold.wasm.service.SolverResource;
 import ai.timefold.wasm.service.dto.PlanningProblem;
 import ai.timefold.wasm.service.dto.WasmConstraint;
 import ai.timefold.wasm.service.dto.WasmFunction;
 import ai.timefold.wasm.service.dto.annotation.DomainPlanningScore;
 import ai.timefold.wasm.service.dto.constraint.DataStream;
+import ai.timefold.wasm.service.dto.constraint.ExpandComponent;
 import ai.timefold.wasm.service.dto.constraint.FilterComponent;
 import ai.timefold.wasm.service.dto.constraint.FlattenLastComponent;
 import ai.timefold.wasm.service.dto.constraint.ForEachComponent;
@@ -32,6 +35,7 @@ import ai.timefold.wasm.service.dto.constraint.GroupByComponent;
 import ai.timefold.wasm.service.dto.constraint.IfExistsComponent;
 import ai.timefold.wasm.service.dto.constraint.IfNotExistsComponent;
 import ai.timefold.wasm.service.dto.constraint.JoinComponent;
+import ai.timefold.wasm.service.dto.constraint.MapComponent;
 import ai.timefold.wasm.service.dto.constraint.PenalizeComponent;
 import ai.timefold.wasm.service.dto.constraint.RewardComponent;
 import ai.timefold.wasm.service.dto.constraint.joiner.DataJoiner;
@@ -166,10 +170,10 @@ public class ConstraintProviderClassGenerator {
         DataStream dataStream = new DataStream();
         var dataStreamInfo = new DataStreamInfo(this, classBuilder, codeBuilder, dataStream, generatedClass);
         var classLoader = SolverResource.GENERATED_CLASS_LOADER.get();
-        for (var steamComponent : wasmConstraint.getStreamComponentList()) {
+        for (var streamComponent : wasmConstraint.getStreamComponentList()) {
             var streamDesc = getDescriptor(dataStream.getConstraintStreamClass());
 
-            switch (steamComponent) {
+            switch (streamComponent) {
                 case ForEachComponent forEachComponent -> {
                     codeBuilder.aload(1);
                     codeBuilder.loadConstant(getDescriptor(classLoader.getClassForDomainClassName(
@@ -181,13 +185,13 @@ public class ConstraintProviderClassGenerator {
                     codeBuilder.invokeinterface(streamDesc, "filter", MethodTypeDesc.of(streamDesc, predicateDesc));
                 }
                 case JoinComponent _, IfExistsComponent _, IfNotExistsComponent _ -> {
-                    var className = switch (steamComponent) {
+                    var className = switch (streamComponent) {
                         case JoinComponent joinComponent -> joinComponent.className();
                         case IfExistsComponent ifExistsComponent -> ifExistsComponent.className();
                         case IfNotExistsComponent ifNotExistsComponent -> ifNotExistsComponent.className();
                         default -> throw new IllegalStateException("Impossible state");
                     };
-                    var joiners = switch (steamComponent) {
+                    var joiners = switch (streamComponent) {
                         case JoinComponent joinComponent -> joinComponent.getJoiners();
                         case IfExistsComponent ifExistsComponent -> ifExistsComponent.getJoiners();
                         case IfNotExistsComponent ifNotExistsComponent -> ifNotExistsComponent.getJoiners();
@@ -202,8 +206,8 @@ public class ConstraintProviderClassGenerator {
                         joiners.get(i).loadJoinerInstance(dataStreamInfo);
                         codeBuilder.aastore();
                     }
-                    codeBuilder.invokeinterface(streamDesc, steamComponent.kind(), MethodTypeDesc.of(
-                            getDescriptor(switch (steamComponent) {
+                    codeBuilder.invokeinterface(streamDesc, streamComponent.kind(), MethodTypeDesc.of(
+                            getDescriptor(switch (streamComponent) {
                                 case JoinComponent _ -> dataStream.getConstraintStreamClassWithExtras(1);
                                 default -> dataStream.getConstraintStreamClass();
                             }),
@@ -234,6 +238,26 @@ public class ConstraintProviderClassGenerator {
                     }
                     codeBuilder.invokeinterface(streamDesc, "flattenLast", MethodTypeDesc.of(streamDesc, getDescriptor(Function.class)));
                 }
+                case MapComponent _, ExpandComponent _ -> {
+                    var funcDesc = getDescriptor(dataStream.getFunctionClass());
+                    var mappers = switch (streamComponent) {
+                        case MapComponent mapComponent -> mapComponent.mappers();
+                        case ExpandComponent expandComponent -> expandComponent.mappers();
+                        default -> throw new IllegalStateException("Impossible state");
+                    };
+                    var streamReturnTypeDesc = getDescriptor(switch (streamComponent) {
+                        case  MapComponent _ -> dataStream.getConstraintStreamClassOfSize(mappers.size());
+                        case  ExpandComponent _ -> dataStream.getConstraintStreamClassWithExtras(mappers.size());
+                        default -> throw new IllegalStateException("Impossible state");
+                    });
+                    var methodParamDescs = new ClassDesc[mappers.size()];
+                    Arrays.fill(methodParamDescs, funcDesc);
+                    for (var mapper : mappers) {
+                        loadFunction(dataStreamInfo, FunctionType.MAPPER, mapper);
+                    }
+                    codeBuilder.invokeinterface(streamDesc, streamComponent.kind(),
+                            MethodTypeDesc.of(streamReturnTypeDesc, methodParamDescs));
+                }
                 case PenalizeComponent penalizeComponent -> {
                     codeBuilder.loadConstant(penalizeComponent.weight());
                     codeBuilder.invokestatic(scoreDesc, "parseScore", MethodTypeDesc.of(scoreDesc, stringDesc));
@@ -260,7 +284,7 @@ public class ConstraintProviderClassGenerator {
                 }
             }
 
-            steamComponent.applyToDataStream(dataStream);
+            streamComponent.applyToDataStream(dataStream);
         }
         return dataStream;
     }

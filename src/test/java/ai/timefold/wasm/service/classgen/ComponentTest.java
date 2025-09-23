@@ -11,14 +11,18 @@ import jakarta.inject.Inject;
 import ai.timefold.solver.core.api.score.buildin.simple.SimpleScore;
 import ai.timefold.wasm.service.Employee;
 import ai.timefold.wasm.service.Schedule;
+import ai.timefold.wasm.service.Shift;
 import ai.timefold.wasm.service.SolverResource;
 import ai.timefold.wasm.service.TestUtils;
 import ai.timefold.wasm.service.dto.WasmConstraint;
 import ai.timefold.wasm.service.dto.WasmFunction;
+import ai.timefold.wasm.service.dto.constraint.ExpandComponent;
+import ai.timefold.wasm.service.dto.constraint.FilterComponent;
 import ai.timefold.wasm.service.dto.constraint.ForEachComponent;
 import ai.timefold.wasm.service.dto.constraint.GroupByComponent;
 import ai.timefold.wasm.service.dto.constraint.IfExistsComponent;
 import ai.timefold.wasm.service.dto.constraint.IfNotExistsComponent;
+import ai.timefold.wasm.service.dto.constraint.MapComponent;
 import ai.timefold.wasm.service.dto.constraint.RewardComponent;
 import ai.timefold.wasm.service.dto.constraint.groupby.CountAggregator;
 import ai.timefold.wasm.service.dto.constraint.joiner.GreaterThanJoiner;
@@ -126,5 +130,72 @@ public class ComponentTest {
         analysis = solverResource.analyze(problem);
         assertThat(analysis.getConstraintAnalysis("thereNotABetterEmployee").score())
                 .isEqualTo(SimpleScore.of(1));
+    }
+
+    @Test
+    public void map() throws JsonProcessingException {
+        var problem = TestUtils.getPlanningProblem();
+        problem.setConstraints(
+                Map.of("employeeId", new WasmConstraint(List.of(
+                        new ForEachComponent("Employee"),
+                        new MapComponent(List.of(new WasmFunction("getEmployeeId"))),
+                        new RewardComponent("1", new WasmFunction("scaleByCount"))
+                )))
+        );
+
+        problem.setProblem(objectMapper.writeValueAsString(new Schedule(
+                List.of(e1), Collections.emptyList()
+        )));
+
+        var analysis = solverResource.analyze(problem);
+        assertThat(analysis.getConstraintAnalysis("employeeId").score())
+                .isEqualTo(SimpleScore.of(1));
+
+        problem.setProblem(objectMapper.writeValueAsString(new Schedule(
+                List.of(e1, e2), Collections.emptyList()
+        )));
+
+        analysis = solverResource.analyze(problem);
+        assertThat(analysis.getConstraintAnalysis("employeeId").score())
+                .isEqualTo(SimpleScore.of(3));
+
+        problem.setProblem(objectMapper.writeValueAsString(new Schedule(
+                List.of(e1, e2, e3), Collections.emptyList()
+        )));
+
+        analysis = solverResource.analyze(problem);
+        assertThat(analysis.getConstraintAnalysis("employeeId").score())
+                .isEqualTo(SimpleScore.of(6));
+    }
+
+    @Test
+    public void expand() throws JsonProcessingException {
+        var problem = TestUtils.getPlanningProblem();
+        problem.setConstraints(
+                Map.of("isEmployeeId0", new WasmConstraint(List.of(
+                        new ForEachComponent("Shift"),
+                        new ExpandComponent(List.of(new WasmFunction("getEmployee"))),
+                        new FilterComponent(new WasmFunction("isEmployeeId0")),
+                        new RewardComponent("1", null)
+                )))
+        );
+
+        var shift = new Shift(e0);
+        problem.setProblem(objectMapper.writeValueAsString(new Schedule(
+                List.of(e0, e1, e2, e3), List.of(shift)
+        )));
+
+        var analysis = solverResource.analyze(problem);
+        assertThat(analysis.getConstraintAnalysis("isEmployeeId0").score())
+                .isEqualTo(SimpleScore.of(1));
+
+        shift = new Shift(e1);
+        problem.setProblem(objectMapper.writeValueAsString(new Schedule(
+                List.of(e0, e1, e2, e3), List.of(shift)
+        )));
+
+        analysis = solverResource.analyze(problem);
+        assertThat(analysis.getConstraintAnalysis("isEmployeeId0").score())
+                .isEqualTo(SimpleScore.of(0));
     }
 }
