@@ -29,6 +29,8 @@ import ai.timefold.wasm.service.dto.constraint.FilterComponent;
 import ai.timefold.wasm.service.dto.constraint.FlattenLastComponent;
 import ai.timefold.wasm.service.dto.constraint.ForEachComponent;
 import ai.timefold.wasm.service.dto.constraint.GroupByComponent;
+import ai.timefold.wasm.service.dto.constraint.IfExistsComponent;
+import ai.timefold.wasm.service.dto.constraint.IfNotExistsComponent;
 import ai.timefold.wasm.service.dto.constraint.JoinComponent;
 import ai.timefold.wasm.service.dto.constraint.PenalizeComponent;
 import ai.timefold.wasm.service.dto.constraint.RewardComponent;
@@ -178,9 +180,20 @@ public class ConstraintProviderClassGenerator {
                     var predicateDesc = loadFunction(dataStreamInfo, FunctionType.PREDICATE, filterComponent.filter());
                     codeBuilder.invokeinterface(streamDesc, "filter", MethodTypeDesc.of(streamDesc, predicateDesc));
                 }
-                case JoinComponent joinerComponent -> {
-                    codeBuilder.loadConstant(getDescriptor(classLoader.getClassForDomainClassName(joinerComponent.className())));
-                    var joiners = joinerComponent.getJoiners();
+                case JoinComponent _, IfExistsComponent _, IfNotExistsComponent _ -> {
+                    var className = switch (steamComponent) {
+                        case JoinComponent joinComponent -> joinComponent.className();
+                        case IfExistsComponent ifExistsComponent -> ifExistsComponent.className();
+                        case IfNotExistsComponent ifNotExistsComponent -> ifNotExistsComponent.className();
+                        default -> throw new IllegalStateException("Impossible state");
+                    };
+                    var joiners = switch (steamComponent) {
+                        case JoinComponent joinComponent -> joinComponent.getJoiners();
+                        case IfExistsComponent ifExistsComponent -> ifExistsComponent.getJoiners();
+                        case IfNotExistsComponent ifNotExistsComponent -> ifNotExistsComponent.getJoiners();
+                        default -> throw new IllegalStateException("Impossible state");
+                    };
+                    codeBuilder.loadConstant(getDescriptor(classLoader.getClassForDomainClassName(className)));
                     codeBuilder.loadConstant(joiners.size());
                     codeBuilder.anewarray(getDescriptor(dataStream.getJoinerClass()));
                     for (var i = 0; i < joiners.size(); i++) {
@@ -189,8 +202,11 @@ public class ConstraintProviderClassGenerator {
                         joiners.get(i).loadJoinerInstance(dataStreamInfo);
                         codeBuilder.aastore();
                     }
-                    codeBuilder.invokeinterface(streamDesc, "join", MethodTypeDesc.of(
-                            getDescriptor(dataStream.getConstraintStreamClassWithExtras(1)),
+                    codeBuilder.invokeinterface(streamDesc, steamComponent.kind(), MethodTypeDesc.of(
+                            getDescriptor(switch (steamComponent) {
+                                case JoinComponent _ -> dataStream.getConstraintStreamClassWithExtras(1);
+                                default -> dataStream.getConstraintStreamClass();
+                            }),
                             getDescriptor(Class.class),
                             getDescriptor(dataStream.getJoinerClass()).arrayType()));
                 }

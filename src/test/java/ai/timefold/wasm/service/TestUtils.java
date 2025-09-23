@@ -204,7 +204,7 @@ public class TestUtils {
                 ),
                 """
                 {"employees": [{"id": 0}, {"id": 1}], "shifts": [{}, {}]}
-                """, new PlanningTermination("1s", null, null, null, null, null, null, null, null)
+                """, new PlanningTermination(null, null, null, null, null, 10, null, null, null)
         );
     }
 
