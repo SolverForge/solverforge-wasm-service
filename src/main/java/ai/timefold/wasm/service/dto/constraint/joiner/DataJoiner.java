@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
 
 @JsonTypeInfo(use=JsonTypeInfo.Id.CUSTOM, property="relation", visible=true)
 @JsonTypeIdResolver(DataJoinerTypeIdResolver.class)
-public sealed interface DataJoiner permits AbstractComparisonJoiner, EqualJoiner, FilteringJoiner, OverlappingJoiner {
+public sealed interface DataJoiner permits LessThanJoiner, GreaterThanJoiner, LessThanOrEqualJoiner, GreaterThanOrEqualJoiner, EqualJoiner, FilteringJoiner, OverlappingJoiner {
     String relation();
     void loadJoinerInstance(DataStreamInfo dataStreamInfo);
 }

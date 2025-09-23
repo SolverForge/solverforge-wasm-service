@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public sealed abstract class AbstractComparisonJoiner implements DataJoiner
+public sealed abstract class AbstractComparisonJoiner
         permits GreaterThanJoiner, GreaterThanOrEqualJoiner, LessThanJoiner, LessThanOrEqualJoiner {
     @Nullable @JsonProperty("map") WasmFunction map;
     @Nullable @JsonProperty("leftMap") WasmFunction leftMap;
@@ -50,7 +50,8 @@ public sealed abstract class AbstractComparisonJoiner implements DataJoiner
         }
     }
 
-    @Override
+    abstract public String relation();
+
     public void loadJoinerInstance(DataStreamInfo dataStreamInfo) {
         var codeBuilder = dataStreamInfo.codeBuilder();
         if (map != null) {

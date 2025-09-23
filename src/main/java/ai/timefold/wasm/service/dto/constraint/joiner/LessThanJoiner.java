@@ -7,7 +7,7 @@ import org.jspecify.annotations.Nullable;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public final class LessThanJoiner extends AbstractComparisonJoiner {
+public final class LessThanJoiner extends AbstractComparisonJoiner implements DataJoiner {
     public LessThanJoiner() {
 
     }

@@ -24,7 +24,7 @@ public record OverlappingJoiner(@Nullable @JsonProperty("startMap") WasmFunction
                                 @Nullable @JsonProperty("rightEndMap") WasmFunction rightEndMap,
                                 @Nullable @JsonProperty("comparator") WasmFunction comparator) implements DataJoiner {
     public OverlappingJoiner() {
-        this(null, null, null, null, null, null, null);
+        this(new WasmFunction(""), new WasmFunction(""), null, null, null, null, null);
     }
 
     @JsonCreator
