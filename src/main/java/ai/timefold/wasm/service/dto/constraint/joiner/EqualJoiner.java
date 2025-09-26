@@ -20,7 +20,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public record EqualJoiner(@Nullable @JsonProperty("map") WasmFunction map,
                           @Nullable @JsonProperty("leftMap") WasmFunction leftMap,
                           @Nullable @JsonProperty("rightMap") WasmFunction rightMap,
-                          @Nullable @JsonProperty("relation") WasmFunction relationPredicate,
+                          @Nullable @JsonProperty("equal") WasmFunction relationPredicate,
                           @Nullable @JsonProperty("hasher") WasmFunction hasher) implements DataJoiner {
     public EqualJoiner() {
         this(new WasmFunction(""), null, null, null, null);

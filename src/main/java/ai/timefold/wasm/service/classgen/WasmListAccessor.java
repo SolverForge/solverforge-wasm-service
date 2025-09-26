@@ -1,5 +1,6 @@
 package ai.timefold.wasm.service.classgen;
 
+import java.util.Optional;
 import java.util.function.IntBinaryOperator;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
@@ -35,23 +36,49 @@ public final class WasmListAccessor {
     public WasmListAccessor(Instance instance, DomainListAccessor domainListAccessor) {
         this.wasmInstance = instance;
 
-        var domainCreateList = instance.export(domainListAccessor.createFunction());
-        var domainGetListItem = instance.export(domainListAccessor.getItemFunction());
-        var domainSetListItem = instance.export(domainListAccessor.setItemFunction());
-        var domainGetListSize = instance.export(domainListAccessor.getSizeFunction());
-        var domainAppendListItem = instance.export(domainListAccessor.appendFunction());
-        var domainInsertListItem = instance.export(domainListAccessor.insertFunction());
-        var domainRemoveListItem = instance.export(domainListAccessor.removeFunction());
-        var domainDeallocListFunction = instance.export(domainListAccessor.deallocator());
+        var domainCreateList = Optional.ofNullable(domainListAccessor.createFunction()).map(instance::export);
+        var domainGetListItem = Optional.ofNullable(domainListAccessor.getItemFunction()).map(instance::export);
+        var domainSetListItem = Optional.ofNullable(domainListAccessor.setItemFunction()).map(instance::export);
+        var domainGetListSize = Optional.ofNullable(domainListAccessor.getSizeFunction()).map(instance::export);
+        var domainAppendListItem = Optional.ofNullable(domainListAccessor.appendFunction()).map(instance::export);
+        var domainInsertListItem = Optional.ofNullable(domainListAccessor.insertFunction()).map(instance::export);
+        var domainRemoveListItem = Optional.ofNullable(domainListAccessor.removeFunction()).map(instance::export);
+        var domainDeallocListFunction = Optional.ofNullable(domainListAccessor.deallocator()).map(instance::export);
 
-        createListFunction = () -> (int) domainCreateList.apply()[0];
-        getListItemFunction = (list, index) -> (int) domainGetListItem.apply(list, index)[0];
-        setListItemFunction = domainSetListItem::apply;
-        getListSizeFunction = list -> (int) domainGetListSize.apply(list)[0];
-        appendListFunction = domainAppendListItem::apply;
-        insertListFunction = domainInsertListItem::apply;
-        removeListFunction = domainRemoveListItem::apply;
-        deallocListFunction = domainDeallocListFunction::apply;
+        createListFunction = domainCreateList.map(createList ->
+                        (IntSupplier) () -> (int) createList.apply()[0])
+                .orElse(() -> {
+                    throw new UnsupportedOperationException("create");
+                });
+        getListItemFunction = domainGetListItem.map(getItem ->
+                (IntBinaryOperator) (list, index) -> (int) getItem.apply(list, index)[0])
+                .orElse((_, _) -> {
+                    throw new UnsupportedOperationException("get");
+                });
+        setListItemFunction = domainSetListItem.map(setItem -> (IntTriConsumer) setItem::apply)
+                .orElse((_, _, _) -> {
+                    throw new UnsupportedOperationException("set");
+                });
+        getListSizeFunction = domainGetListSize.map(getSize -> (IntUnaryOperator) list -> (int) getSize.apply(list)[0])
+                .orElse(_ -> {
+                    throw new UnsupportedOperationException("size");
+                });
+        appendListFunction = domainAppendListItem.map(listAppend -> (IntBiConsumer) listAppend::apply)
+                .orElse((_, _) -> {
+                    throw new UnsupportedOperationException("append");
+                });
+        insertListFunction = domainInsertListItem.map(listInsert -> (IntTriConsumer) listInsert::apply)
+                .orElse((_, _, _) -> {
+                    throw new UnsupportedOperationException("insert");
+                });
+        removeListFunction = domainRemoveListItem.map(listRemove -> (IntBiConsumer) listRemove::apply)
+                .orElse((_, _) -> {
+                    throw new UnsupportedOperationException("remove");
+                });
+        deallocListFunction = domainDeallocListFunction.map(dealloc -> (IntConsumer) dealloc::apply)
+                .orElse(_ -> {
+                    throw new UnsupportedOperationException("dealloc");
+                });
     }
 
     public WasmObject newInstance() {

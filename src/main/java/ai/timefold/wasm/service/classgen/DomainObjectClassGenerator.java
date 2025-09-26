@@ -141,40 +141,6 @@ public class DomainObjectClassGenerator {
         codeBuilder.invokevirtual(getDescriptor(PrintStream.class), "println", MethodTypeDesc.of(voidDesc, typeDesc));
     }
 
-    private static void readWasmField(CodeBuilder codeBuilder, int offset, String type) {
-        codeBuilder.aload(0);
-        codeBuilder.loadConstant(offset);
-
-        switch (type) {
-            case "int" -> {
-                codeBuilder.invokevirtual(wasmObjectDesc, "readIntField",
-                        MethodTypeDesc.of(intDesc, intDesc));
-            }
-            case "long" -> {
-                codeBuilder.invokevirtual(wasmObjectDesc, "readLongField",
-                        MethodTypeDesc.of(longDesc, intDesc));
-            }
-            case "float" -> {
-                codeBuilder.invokevirtual(wasmObjectDesc, "readFloatField",
-                        MethodTypeDesc.of(floatDesc, intDesc));
-            }
-            case "double" -> {
-                codeBuilder.invokevirtual(wasmObjectDesc, "readDoubleField",
-                        MethodTypeDesc.of(doubleDesc, intDesc));
-            }
-            default -> {
-                if (type.endsWith("[]")) {
-                    codeBuilder.loadConstant(getWasmTypeDesc(type.substring(0, type.length() - 2)));
-                    codeBuilder.invokestatic(getDescriptor(WasmList.class), "ofExisting", MethodTypeDesc.of(getDescriptor(WasmList.class), intDesc, getDescriptor(Class.class)));
-                    return;
-                }
-                codeBuilder.invokevirtual(wasmObjectDesc, "readReferenceField",
-                        MethodTypeDesc.of(wasmObjectDesc, intDesc));
-                codeBuilder.checkcast(getWasmTypeDesc(type));
-            }
-        }
-    }
-
     public void prepareClassesForPlanningProblem(PlanningProblem planningProblem) {
         for (var domainEntry : planningProblem.getDomainObjectMap().entrySet()) {
             prepareClassForDomainObject(domainEntry.getValue());
@@ -374,7 +340,7 @@ public class DomainObjectClassGenerator {
                                 if (finalIsPlanningScore) {
                                     codeBuilder.return_();
                                 } else {
-                                    if (field.getValue().getAccessor() != null) {
+                                    if (field.getValue().getAccessor() != null && field.getValue().getAccessor().setterFunctionName() != null) {
                                         writeWasmFieldUsingAccessor(field.getValue(), codeBuilder, valueBuilder -> {
                                             valueBuilder.loadLocal(getTypeKind(field.getValue().getType()), 1);
                                         });
@@ -484,6 +450,14 @@ public class DomainObjectClassGenerator {
                         "longBitsToDouble",
                         MethodTypeDesc.of(doubleDesc, longDesc));
             }
+            case "String" -> {
+                codeBuilder.l2i();
+                codeBuilder.aload(0);
+                codeBuilder.getfield(wasmObjectDesc, "wasmInstance", instanceDesc);
+                codeBuilder.invokevirtual(instanceDesc, "memory", MethodTypeDesc.of(getDescriptor(Memory.class)));
+                codeBuilder.swap();
+                codeBuilder.invokeinterface(getDescriptor(Memory.class), "readCString", MethodTypeDesc.of(stringDesc, intDesc));
+            }
             default -> {
                 codeBuilder.l2i();
                 var notNullLabel = codeBuilder.newLabel();
@@ -559,6 +533,9 @@ public class DomainObjectClassGenerator {
             case "double" -> {
                 codeBuilder.invokestatic(getDescriptor(Double.class), "doubleToLongBits",
                         MethodTypeDesc.of(longDesc, doubleDesc));
+            }
+            case "String" -> {
+                throw new UnsupportedOperationException();
             }
             default -> {
                 var isNotNullLabel = codeBuilder.newLabel();

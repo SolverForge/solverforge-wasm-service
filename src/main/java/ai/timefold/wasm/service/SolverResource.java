@@ -60,10 +60,14 @@ public class SolverResource {
                 .withMemoryFactory(ByteArrayMemory::new)
                 .withMachineFactory(MachineFactoryCompiler::compile);
 
-        // let's just use the default options for now
-        var options = WasiOptions.builder()
-                .inheritSystem()
-                .build();
+        var optionsBuilder = WasiOptions.builder()
+                .inheritSystem();
+
+        for (var environmentEntry : System.getenv().entrySet()) {
+            optionsBuilder.withEnvironment(environmentEntry.getKey(), environmentEntry.getValue());
+        }
+
+        var options = optionsBuilder.build();
         // create our instance of wasip1
         var wasi = WasiPreview1.builder().withOptions(options).build();
 
