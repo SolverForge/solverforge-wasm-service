@@ -1,5 +1,6 @@
 package ai.timefold.wasm.service;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,7 +93,7 @@ public class HostFunctionProvider {
      */
     private int getFieldSize(String type) {
         return switch (type) {
-            case "long", "double" -> 8;
+            case "long", "double", "LocalDate" -> 8; // LocalDate stored as epoch day (long)
             default -> WORD_SIZE; // int, float, pointers, arrays all use 4 bytes
         };
     }
@@ -103,7 +104,8 @@ public class HostFunctionProvider {
     private boolean isPrimitiveType(String type) {
         return type.equals("int") || type.equals("long") ||
                type.equals("float") || type.equals("double") ||
-               type.equals("boolean") || type.equals("String");
+               type.equals("boolean") || type.equals("String") ||
+               type.equals("LocalDate");
     }
 
     /**
@@ -319,6 +321,13 @@ public class HostFunctionProvider {
                 instance.memory().writeCString(strPtr, str);
                 instance.memory().writeI32(ptr, strPtr);
             }
+            case "LocalDate" -> {
+                // Parse ISO date string (e.g., "2024-01-15") and store as epoch day (long)
+                LocalDate date = LocalDate.parse(value.asText());
+                long epochDay = date.toEpochDay();
+                instance.memory().writeI32(ptr, (int) epochDay);
+                instance.memory().writeI32(ptr + 4, (int) (epochDay >> 32));
+            }
             default -> {
                 // Unknown primitive type, try to write as int
                 if (value.isInt()) {
@@ -502,6 +511,12 @@ public class HostFunctionProvider {
                     String str = instance.memory().readCString(strPtr);
                     out.append("\"").append(escapeJson(str)).append("\"");
                 }
+            }
+            case "LocalDate" -> {
+                // Read epoch day (long) and convert back to ISO date string
+                long epochDay = instance.memory().readLong(ptr);
+                LocalDate date = LocalDate.ofEpochDay(epochDay);
+                out.append("\"").append(date.toString()).append("\"");
             }
             default -> out.append(instance.memory().readInt(ptr));
         }
