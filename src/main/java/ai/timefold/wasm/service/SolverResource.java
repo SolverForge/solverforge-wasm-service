@@ -139,21 +139,31 @@ public class SolverResource {
 
     @POST
     @Path("solve")
-    public SolveResult<?> solve(PlanningProblem planningProblem) {
+    public SolveResult solve(PlanningProblem planningProblem) {
         return usingGeneratedSolverAndPlanningProblem(planningProblem, (solverInput, solverFactory) -> {
             var solver = solverFactory.buildSolver();
 
             // Copy the solution into a map; we don't know enough from the WASM
             // to create an accurate planning clone that cannot be corrupted by
             // constraints/setters
-            MutableReference<SolveResult<?>> bestSolutionRef = new MutableReference<>(
-                    new SolveResult<>(planningProblem.getProblem(), null));
+            MutableReference<SolveResult> bestSolutionRef = new MutableReference<>(
+                    new SolveResult(planningProblem.getProblem(), null, null));
             solver.addEventListener(event -> {
-                bestSolutionRef.setValue(new SolveResult<>(event.getNewBestSolution().toString(), event.getNewBestScore()));
+                bestSolutionRef.setValue(new SolveResult(event.getNewBestSolution().toString(), event.getNewBestScore(), null));
             });
 
             solver.solve(solverInput);
-            return bestSolutionRef.getValue();
+
+            // Extract metrics from DefaultSolver
+            var result = bestSolutionRef.getValue();
+            var defaultSolver = (ai.timefold.solver.core.impl.solver.DefaultSolver<?>) solver;
+            var stats = new ai.timefold.wasm.service.dto.SolverStats(
+                    defaultSolver.getTimeMillisSpent(),
+                    defaultSolver.getScoreCalculationCount(),
+                    defaultSolver.getScoreCalculationSpeed(),
+                    defaultSolver.getMoveEvaluationCount(),
+                    defaultSolver.getMoveEvaluationSpeed());
+            return new SolveResult(result.solution(), result.score(), stats);
         });
     }
 
