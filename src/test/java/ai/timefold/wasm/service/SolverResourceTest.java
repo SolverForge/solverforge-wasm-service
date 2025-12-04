@@ -9,7 +9,6 @@ import jakarta.inject.Inject;
 
 import ai.timefold.solver.core.api.score.buildin.simple.SimpleScore;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -24,11 +23,6 @@ public class SolverResourceTest {
 
     @Inject
     SolverResource solverResource;
-
-    @BeforeEach
-    public void setup() {
-        TestUtils.setup(solverResource, objectMapper);
-    }
 
     @Test
     public void solveTest() throws JsonProcessingException {

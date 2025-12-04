@@ -3,13 +3,11 @@ package ai.timefold.wasm.service;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
 
+import jakarta.inject.Inject;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 
@@ -38,6 +36,7 @@ import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.wasi.WasiOptions;
 import com.dylibso.chicory.wasi.WasiPreview1;
 import com.dylibso.chicory.wasm.Parser;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Path("/")
 public class SolverResource {
@@ -46,17 +45,16 @@ public class SolverResource {
     public static ThreadLocal<Allocator> ALLOCATOR = new ThreadLocal<>();
     public static ThreadLocal<DomainObjectClassLoader> GENERATED_CLASS_LOADER = new ThreadLocal<>();
 
-    private List<HostFunction> hostFunctionList = Collections.emptyList();
-
-    public void setHostFunctionList(List<HostFunction> hostFunctionList) {
-        this.hostFunctionList = hostFunctionList;
-    }
+    @Inject
+    ObjectMapper objectMapper;
 
     @ConfigProperty(name = "generatedClassPath", defaultValue = "")
     Optional<String> generatedClassPath;
 
-    private Instance createWasmInstance(byte[] wasm) {
-        var instanceBuilder = Instance.builder(Parser.parse(wasm))
+    private Instance createWasmInstance(PlanningProblem planningProblem) {
+        var hostFunctions = new HostFunctionProvider(objectMapper).createHostFunctions();
+
+        var instanceBuilder = Instance.builder(Parser.parse(planningProblem.getWasm()))
                 .withMemoryFactory(ByteArrayMemory::new)
                 .withMachineFactory(MachineFactoryCompiler::compile);
 
@@ -71,15 +69,11 @@ public class SolverResource {
         // create our instance of wasip1
         var wasi = WasiPreview1.builder().withOptions(options).build();
 
-        var importFunctions = new ImportFunction[hostFunctionList.size()];
-        for (int i = 0; i < importFunctions.length; i++) {
-            importFunctions[i] = hostFunctionList.get(i);
-        }
+        var importFunctions = hostFunctions.toArray(new ImportFunction[0]);
         instanceBuilder.withImportValues(ImportValues.builder()
                 .addFunction(importFunctions)
                 .addFunction(wasi.toHostFunctions())
                 .build());
-
 
         var out = instanceBuilder.build();
         out.initialize(true);
@@ -100,7 +94,7 @@ public class SolverResource {
         var solverConfig = new SolverConfig();
 
         var domainObjectClassGenerator = new DomainObjectClassGenerator();
-        var wasmInstance = createWasmInstance(planningProblem.getWasm());
+        var wasmInstance = createWasmInstance(planningProblem);
 
         try {
             var classLoader = new DomainObjectClassLoader();
