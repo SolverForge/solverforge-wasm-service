@@ -254,10 +254,13 @@ public class ConstraintProviderClassGenerator {
                     codeBuilder.invokeinterface(streamDesc, "groupBy", MethodTypeDesc.of(methodReturnDesc, methodParameterDescriptors));
                 }
                 case FlattenLastComponent flattenLastComponent -> {
+                    String elementType = flattenLastComponent.elementType();
+                    FunctionType funcType = "int".equals(elementType) ? FunctionType.INT_LIST_MAPPER : FunctionType.LIST_MAPPER;
+
                     if (flattenLastComponent.map() == null) {
                         codeBuilder.getstatic(wasmObjectDesc, "TO_LIST", getDescriptor(Function.class));
                     } else {
-                        loadFunctionOfSize(dataStreamInfo, 1, FunctionType.LIST_MAPPER, flattenLastComponent.map());
+                        loadFunctionOfSize(dataStreamInfo, 1, funcType, flattenLastComponent.map());
                     }
                     codeBuilder.invokeinterface(streamDesc, "flattenLast", MethodTypeDesc.of(streamDesc, getDescriptor(Function.class)));
                 }

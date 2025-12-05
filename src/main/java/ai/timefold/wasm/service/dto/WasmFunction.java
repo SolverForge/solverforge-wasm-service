@@ -1,6 +1,8 @@
 package ai.timefold.wasm.service.dto;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
@@ -24,6 +26,7 @@ import ai.timefold.wasm.service.ExportCache;
 import ai.timefold.wasm.service.PredicateCache;
 import ai.timefold.wasm.service.SolverResource;
 import ai.timefold.wasm.service.classgen.WasmList;
+import ai.timefold.wasm.service.classgen.WasmListAccessor;
 import ai.timefold.wasm.service.classgen.WasmObject;
 
 import org.jspecify.annotations.NullMarked;
@@ -239,6 +242,57 @@ public class WasmFunction {
                     e.getMemoryPointer())[0]).asList();
             default -> throw new IllegalArgumentException("Unexpected value: " + tupleSize);
         };
+    }
+
+    /**
+     * Returns a function that reads a primitive int list from WASM memory and wraps each int value
+     * as a WasmObject. Used for flattenLast on primitive list types (e.g., LocalDate stored as epoch days).
+     */
+    public Object asToIntListFunction(int tupleSize, Instance instance) {
+        var wasmFunction = getExport(wasmFunctionName, instance);
+        return switch (tupleSize) {
+            case 1 -> (Function<WasmObject, List<WasmObject>>) a -> {
+                int listPtr = (int) wasmFunction.apply(a.getMemoryPointer())[0];
+                return readIntListWrapped(listPtr);
+            };
+            case 2 -> (BiFunction<WasmObject, WasmObject, List<WasmObject>>) (a, b) -> {
+                int listPtr = (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer())[0];
+                return readIntListWrapped(listPtr);
+            };
+            case 3 -> (TriFunction<WasmObject, WasmObject, WasmObject, List<WasmObject>>) (a, b, c) -> {
+                int listPtr = (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer())[0];
+                return readIntListWrapped(listPtr);
+            };
+            case 4 -> (QuadFunction<WasmObject, WasmObject, WasmObject, WasmObject, List<WasmObject>>) (a, b, c, d) -> {
+                int listPtr = (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer(), d.getMemoryPointer())[0];
+                return readIntListWrapped(listPtr);
+            };
+            case 5 -> (PentaFunction<WasmObject, WasmObject, WasmObject, WasmObject, WasmObject, List<WasmObject>>) (a, b, c, d, e) -> {
+                int listPtr = (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer(), d.getMemoryPointer(), e.getMemoryPointer())[0];
+                return readIntListWrapped(listPtr);
+            };
+            default -> throw new IllegalArgumentException("Unexpected value: " + tupleSize);
+        };
+    }
+
+    /**
+     * Reads a primitive int list from WASM memory, wrapping each int value as a WasmObject.
+     * The list accessor's getItem returns the int value directly (not a pointer to an object).
+     */
+    private static List<WasmObject> readIntListWrapped(int listPtr) {
+        if (listPtr == 0) {
+            return List.of();
+        }
+        var listAccessor = SolverResource.LIST_ACCESSOR.get();
+        var listObj = WasmObject.ofExisting(listAccessor.getWasmInstance(), listPtr);
+        int size = listAccessor.getLength(listObj);
+        List<WasmObject> result = new ArrayList<>(size);
+        for (int i = 0; i < size; i++) {
+            // For primitive int lists, getItem returns the int value directly, not a pointer
+            var item = listAccessor.getItem(listObj, i, WasmObject::wrappingInt);
+            result.add(item);
+        }
+        return result;
     }
 
     public Object asToIntFunction(int tupleSize, Instance instance) {

@@ -15,6 +15,7 @@ public enum FunctionType {
     PREDICATE(WasmFunction::asPredicate),
     MAPPER(WasmFunction::asFunction),
     LIST_MAPPER(WasmFunction::asToListFunction),
+    INT_LIST_MAPPER(WasmFunction::asToIntListFunction),
     TO_INT(WasmFunction::asToIntFunction),
     TO_LONG(WasmFunction::asToLongFunction);
 
@@ -27,7 +28,7 @@ public enum FunctionType {
     public ClassDesc getClassDescriptor(DataStream dataStream, int argCount) {
         return getDescriptor(switch (this) {
             case PREDICATE -> dataStream.getPredicateClassOfSize(argCount);
-            case MAPPER, LIST_MAPPER -> dataStream.getFunctionClassOfSize(argCount);
+            case MAPPER, LIST_MAPPER, INT_LIST_MAPPER -> dataStream.getFunctionClassOfSize(argCount);
             case TO_INT -> dataStream.getToIntFunctionClassOfSize(argCount);
             case TO_LONG -> dataStream.getToLongFunctionClassOfSize(argCount);
         });

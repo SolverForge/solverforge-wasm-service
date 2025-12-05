@@ -303,7 +303,7 @@ public class AggregatorsTest {
                         new GroupByComponent(Collections.emptyList(), List.of(new ConsecutiveAggregator(new WasmFunction("getEmployeeId"), List.of(
                            ConsecutiveSequenceField.COUNT
                         )))),
-                        new FlattenLastComponent(null),
+                        new FlattenLastComponent(null, null),
                         new RewardComponent("1", new WasmFunction("scaleByCountItemSquared"))
                 )))
         );
@@ -345,7 +345,7 @@ public class AggregatorsTest {
                                 List.of(
                                     ConnectedRangeField.MAX_OVERLAP
                         )))),
-                        new FlattenLastComponent(null),
+                        new FlattenLastComponent(null, null),
                         new RewardComponent("1", new WasmFunction("scaleByCountItemSquared"))
                 )))
         );

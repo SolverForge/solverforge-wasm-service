@@ -9,13 +9,15 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 @NullMarked
-public record FlattenLastComponent(@Nullable @JsonProperty("map") WasmFunction map) implements StreamComponent {
+public record FlattenLastComponent(
+        @Nullable @JsonProperty("map") WasmFunction map,
+        @Nullable @JsonProperty("elementType") String elementType) implements StreamComponent {
     @JsonCreator
     public FlattenLastComponent {
     }
 
     public FlattenLastComponent() {
-        this(null);
+        this(null, null);
     }
 
     @Override
