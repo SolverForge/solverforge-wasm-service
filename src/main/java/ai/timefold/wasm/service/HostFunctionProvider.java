@@ -30,10 +30,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * The functions are imported by WASM modules under the "host" namespace.
  */
 public class HostFunctionProvider {
-    // IMPORTANT: This is Integer.SIZE (32 bits) for backwards compatibility
-    // with existing tests that assume this byte offset between fields.
-    // The original code used Integer.SIZE which is 32 (bits) but treated it as bytes.
-    private static final int WORD_SIZE = Integer.SIZE;
+    // Standard WASM word size: 4 bytes (32 bits = i32)
+    // WASM linear memory uses 4-byte aligned fields for i32 values.
+    private static final int WORD_SIZE = Integer.BYTES;
+
+    // List structure offsets (12 bytes total):
+    // [size: i32][capacity: i32][backing_array_ptr: i32]
+    private static final int SIZE_OFFSET = 0;
+    private static final int CAPACITY_OFFSET = WORD_SIZE;
+    private static final int BACKING_ARRAY_OFFSET = WORD_SIZE * 2;
+    private static final int LIST_HEADER_SIZE = WORD_SIZE * 3;
+    private static final int INITIAL_CAPACITY = 4;
+
     private final ObjectMapper objectMapper;
     private final Map<String, DomainObject> domainObjectMap;
 
@@ -563,17 +571,21 @@ public class HostFunctionProvider {
      * hnewList() -> i32
      *
      * Allocates a new empty list structure in WASM memory.
-     * List structure: [size: i32][backing_array_ptr: i32]
+     * List structure: [size: i32][capacity: i32][backing_array_ptr: i32]
      */
     private HostFunction createNewList() {
         return new HostFunction("host", "hnewList",
                 FunctionType.of(List.of(), List.of(ValType.I32)),
                 (instance, args) -> {
                     var alloc = instance.export("alloc");
-                    var listInstance = (int) alloc.apply(WORD_SIZE * 2)[0];
+                    var listInstance = (int) alloc.apply(LIST_HEADER_SIZE)[0];
 
-                    instance.memory().writeI32(listInstance, 0);
-                    instance.memory().writeI32(listInstance + WORD_SIZE, 0);
+                    // Allocate initial backing array with INITIAL_CAPACITY
+                    var backingArray = (int) alloc.apply((long) WORD_SIZE * INITIAL_CAPACITY)[0];
+
+                    instance.memory().writeI32(listInstance + SIZE_OFFSET, 0);
+                    instance.memory().writeI32(listInstance + CAPACITY_OFFSET, INITIAL_CAPACITY);
+                    instance.memory().writeI32(listInstance + BACKING_ARRAY_OFFSET, backingArray);
 
                     return new long[] { listInstance };
                 });
@@ -589,7 +601,7 @@ public class HostFunctionProvider {
                 FunctionType.of(List.of(ValType.I32, ValType.I32), List.of(ValType.I32)),
                 (instance, args) -> {
                     var listInstance = (int) args[0];
-                    var backingArray = (int) instance.memory().readI32(listInstance + WORD_SIZE);
+                    var backingArray = (int) instance.memory().readI32(listInstance + BACKING_ARRAY_OFFSET);
                     int itemIndex = (int) args[1];
                     var item = instance.memory().readI32(backingArray + (WORD_SIZE * itemIndex));
 
@@ -607,7 +619,7 @@ public class HostFunctionProvider {
                 FunctionType.of(List.of(ValType.I32, ValType.I32, ValType.I32), List.of()),
                 (instance, args) -> {
                     var listInstance = (int) args[0];
-                    var backingArray = (int) instance.memory().readI32(listInstance + WORD_SIZE);
+                    var backingArray = (int) instance.memory().readI32(listInstance + BACKING_ARRAY_OFFSET);
                     int itemIndex = (int) args[1];
                     var item = (int) args[2];
                     instance.memory().writeI32(backingArray + (WORD_SIZE * itemIndex), item);
