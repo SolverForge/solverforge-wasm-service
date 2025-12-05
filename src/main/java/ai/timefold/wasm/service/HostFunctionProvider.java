@@ -69,7 +69,8 @@ public class HostFunctionProvider {
                 createInsert(),
                 createRemove(),
                 createRound(),
-                createStringEquals()
+                createStringEquals(),
+                createListContainsString()
         );
     }
 
@@ -766,6 +767,61 @@ public class HostFunctionProvider {
                     String str2 = instance.memory().readCString(ptr2);
 
                     return new long[] { str1.equals(str2) ? 1 : 0 };
+                });
+    }
+
+    /**
+     * hlistContainsString(listPtr: i32, elementPtr: i32) -> i32
+     *
+     * Checks if a list contains a string element.
+     * Returns 1 if the element is found, 0 otherwise.
+     */
+    private HostFunction createListContainsString() {
+        return new HostFunction("host", "hlistContainsString",
+                FunctionType.of(List.of(ValType.I32, ValType.I32), List.of(ValType.I32)),
+                (instance, args) -> {
+                    int listPtr = (int) args[0];
+                    int elementPtr = (int) args[1];
+
+                    // If list is null, return false
+                    if (listPtr == 0) {
+                        return new long[] { 0 };
+                    }
+
+                    // Read list size from memory (first i32 in the list struct)
+                    int size = instance.memory().readInt(listPtr);
+
+                    // If element is null, check if list contains null
+                    if (elementPtr == 0) {
+                        // Read array pointer (third i32 in the list struct)
+                        int arrayPtr = instance.memory().readInt(listPtr + 8);
+                        for (int i = 0; i < size; i++) {
+                            int itemPtr = instance.memory().readInt(arrayPtr + (i * 4));
+                            if (itemPtr == 0) {
+                                return new long[] { 1 };
+                            }
+                        }
+                        return new long[] { 0 };
+                    }
+
+                    // Read the target string
+                    String targetStr = instance.memory().readCString(elementPtr);
+
+                    // Read array pointer
+                    int arrayPtr = instance.memory().readInt(listPtr + 8);
+
+                    // Iterate through list and compare strings
+                    for (int i = 0; i < size; i++) {
+                        int itemPtr = instance.memory().readInt(arrayPtr + (i * 4));
+                        if (itemPtr != 0) {
+                            String itemStr = instance.memory().readCString(itemPtr);
+                            if (targetStr.equals(itemStr)) {
+                                return new long[] { 1 };
+                            }
+                        }
+                    }
+
+                    return new long[] { 0 };
                 });
     }
 }
