@@ -333,13 +333,25 @@ public class HostFunctionProvider {
             JsonNode elementJson = arrayNode.get(i);
 
             if (isPrimitiveType(elementType)) {
-                // Primitive element - allocate and write value
-                int elementPtr = (int) alloc.apply(getFieldSize(elementType))[0];
-                FieldDescriptor tempField = new FieldDescriptor(elementType, null, null);
-                writePrimitiveField(instance, alloc, elementPtr, tempField, elementJson);
-                append.apply(list, elementPtr);
+                int value = switch (elementType) {
+                    case "int", "boolean" -> elementJson.asInt();
+                    case "LocalDate" -> {
+                        if (elementJson.isNumber()) {
+                            yield elementJson.asInt();
+                        } else {
+                            yield (int) LocalDate.parse(elementJson.asText()).toEpochDay();
+                        }
+                    }
+                    case "String" -> {
+                        String str = elementJson.asText();
+                        int strPtr = (int) alloc.apply(str.getBytes().length + 1)[0];
+                        instance.memory().writeCString(strPtr, str);
+                        yield strPtr;
+                    }
+                    default -> throw new IllegalArgumentException("Unsupported primitive list element type: " + elementType);
+                };
+                append.apply(list, value);
             } else {
-                // Object element - parse recursively
                 DomainObject elementDef = domainObjectMap.get(elementType);
                 if (elementDef != null) {
                     int element = parseObject(instance, alloc, newList, append,
