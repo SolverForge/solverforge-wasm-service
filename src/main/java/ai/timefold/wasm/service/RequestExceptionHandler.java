@@ -14,14 +14,20 @@ public class RequestExceptionHandler implements ExceptionMapper<Exception> {
     @Override
     public Response toResponse(Exception exception) {
         exception.printStackTrace();
-        // Include cause chain in message for better debugging
+        // Include full cause chain for better debugging
         StringBuilder msg = new StringBuilder();
         Throwable t = exception;
         while (t != null) {
-            if (msg.length() > 0) msg.append(" -> ");
-            msg.append(t.getClass().getSimpleName());
+            if (msg.length() > 0) msg.append(" | ");
+            msg.append(t.getClass().getName());
             if (t.getMessage() != null) {
                 msg.append(": ").append(t.getMessage());
+            }
+            // Also include first stack frame for context
+            if (t.getStackTrace().length > 0) {
+                var frame = t.getStackTrace()[0];
+                msg.append(" at ").append(frame.getClassName()).append(".").append(frame.getMethodName())
+                   .append("(").append(frame.getFileName()).append(":").append(frame.getLineNumber()).append(")");
             }
             t = t.getCause();
         }
