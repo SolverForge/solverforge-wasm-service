@@ -122,14 +122,30 @@ public class WasmFunction {
     }
 
     // NO CACHING - mappers read mutable fields (planning variables)
+    // Returns null for pointer 0 to avoid all nulls being "equal" in joiners
     private Object asFunctionWithDefaultEqualsAndComparator(int tupleSize, Instance instance) {
         var wasmFunction = getExport(wasmFunctionName, instance);
         return switch (tupleSize) {
-            case 1 -> (Function<WasmObject, WasmObject>) a -> WasmObject.ofExisting(instance, (int) wasmFunction.apply(a.getMemoryPointer())[0]);
-            case 2 -> (BiFunction<WasmObject, WasmObject, WasmObject>) (a, b) -> WasmObject.ofExisting(instance, (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer())[0]);
-            case 3 -> (TriFunction<WasmObject, WasmObject, WasmObject, WasmObject>) (a, b, c) -> WasmObject.ofExisting(instance, (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer())[0]);
-            case 4 -> (QuadFunction<WasmObject, WasmObject, WasmObject, WasmObject, WasmObject>) (a, b, c, d) -> WasmObject.ofExisting(instance, (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer(), d.getMemoryPointer())[0]);
-            case 5 -> (PentaFunction<WasmObject, WasmObject, WasmObject, WasmObject, WasmObject, WasmObject>) (a, b, c, d, e) -> WasmObject.ofExisting(instance, (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer(), d.getMemoryPointer(), e.getMemoryPointer())[0]);
+            case 1 -> (Function<WasmObject, WasmObject>) a -> {
+                int ptr = (int) wasmFunction.apply(a.getMemoryPointer())[0];
+                return ptr == 0 ? null : WasmObject.ofExisting(instance, ptr);
+            };
+            case 2 -> (BiFunction<WasmObject, WasmObject, WasmObject>) (a, b) -> {
+                int ptr = (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer())[0];
+                return ptr == 0 ? null : WasmObject.ofExisting(instance, ptr);
+            };
+            case 3 -> (TriFunction<WasmObject, WasmObject, WasmObject, WasmObject>) (a, b, c) -> {
+                int ptr = (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer())[0];
+                return ptr == 0 ? null : WasmObject.ofExisting(instance, ptr);
+            };
+            case 4 -> (QuadFunction<WasmObject, WasmObject, WasmObject, WasmObject, WasmObject>) (a, b, c, d) -> {
+                int ptr = (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer(), d.getMemoryPointer())[0];
+                return ptr == 0 ? null : WasmObject.ofExisting(instance, ptr);
+            };
+            case 5 -> (PentaFunction<WasmObject, WasmObject, WasmObject, WasmObject, WasmObject, WasmObject>) (a, b, c, d, e) -> {
+                int ptr = (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer(), d.getMemoryPointer(), e.getMemoryPointer())[0];
+                return ptr == 0 ? null : WasmObject.ofExisting(instance, ptr);
+            };
             default -> throw new IllegalArgumentException("Unexpected value: " + tupleSize);
         };
     }
