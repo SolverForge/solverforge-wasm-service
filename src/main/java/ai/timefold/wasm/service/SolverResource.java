@@ -53,7 +53,7 @@ public class SolverResource {
 
     public static ThreadLocal<Instance> INSTANCE = new ThreadLocal<>();
     public static ThreadLocal<ExportCache> EXPORT_CACHE = new ThreadLocal<>();
-    public static ThreadLocal<PredicateCache> PREDICATE_CACHE = new ThreadLocal<>();
+    public static ThreadLocal<FunctionCache> FUNCTION_CACHE = new ThreadLocal<>();
     public static ThreadLocal<WasmListAccessor> LIST_ACCESSOR = new ThreadLocal<>();
     public static ThreadLocal<Allocator> ALLOCATOR = new ThreadLocal<>();
     public static ThreadLocal<DomainObjectClassLoader> GENERATED_CLASS_LOADER = new ThreadLocal<>();
@@ -144,7 +144,7 @@ public class SolverResource {
             GENERATED_CLASS_LOADER.set(classLoader);
             INSTANCE.set(wasmInstance);
             EXPORT_CACHE.set(new ExportCache(wasmInstance));
-            PREDICATE_CACHE.set(new PredicateCache());
+            FUNCTION_CACHE.set(new FunctionCache());
             LIST_ACCESSOR.set(new WasmListAccessor(wasmInstance, planningProblem.getListAccessor()));
             ALLOCATOR.set(new Allocator(wasmInstance, planningProblem.getAllocator(), planningProblem.getDeallocator(),
                     planningProblem.getSolutionDeallocator()));
@@ -177,7 +177,7 @@ public class SolverResource {
         } finally {
             GENERATED_CLASS_LOADER.remove();
             LIST_ACCESSOR.remove();
-            PREDICATE_CACHE.remove();
+            FUNCTION_CACHE.remove();
             EXPORT_CACHE.remove();
             INSTANCE.remove();
             ALLOCATOR.remove();

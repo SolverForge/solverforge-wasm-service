@@ -344,7 +344,7 @@ public class DomainObjectClassGenerator {
                                 // Invalidate predicate cache when planning variable changes
                                 if (finalIsPlanningVariable) {
                                     codeBuilder.aload(0);
-                                    codeBuilder.invokevirtual(wasmObjectDesc, "invalidatePredicateCache", MethodTypeDesc.of(voidDesc));
+                                    codeBuilder.invokevirtual(wasmObjectDesc, "invalidateFunctionCache", MethodTypeDesc.of(voidDesc));
                                 }
 
                                 if (finalIsPlanningScore) {

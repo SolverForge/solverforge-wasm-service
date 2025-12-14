@@ -7,7 +7,7 @@ import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.ToIntFunction;
 
-import ai.timefold.wasm.service.PredicateCache;
+import ai.timefold.wasm.service.FunctionCache;
 import ai.timefold.wasm.service.SolverResource;
 
 import com.dylibso.chicory.runtime.Instance;
@@ -21,10 +21,10 @@ public class WasmObject implements Comparable<WasmObject> {
 
     /**
      * Called when a planning variable on this entity is modified.
-     * Invalidates any cached predicate results involving this entity.
+     * Invalidates any cached function results involving this entity.
      */
-    public void invalidatePredicateCache() {
-        PredicateCache cache = SolverResource.PREDICATE_CACHE.get();
+    public void invalidateFunctionCache() {
+        FunctionCache cache = SolverResource.FUNCTION_CACHE.get();
         if (cache != null) {
             cache.invalidateEntity(memoryPointer);
         }
