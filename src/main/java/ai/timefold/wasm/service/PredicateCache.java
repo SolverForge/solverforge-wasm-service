@@ -1,6 +1,8 @@
 package ai.timefold.wasm.service;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import ai.timefold.wasm.service.classgen.WasmObject;
@@ -14,7 +16,7 @@ import ai.timefold.wasm.service.classgen.WasmObject;
  * the same pair is evaluated again without field changes.
  *
  * The cache is invalidated when entities are modified during move application.
- * This is tracked via entity version numbers or explicit invalidation.
+ * Uses reverse index for O(1) invalidation instead of O(cache_size).
  */
 public class PredicateCache {
 
@@ -37,6 +39,11 @@ public class PredicateCache {
     private final Map<BinaryKey, Boolean> binaryCache = new ConcurrentHashMap<>();
     private final Map<TernaryKey, Boolean> ternaryCache = new ConcurrentHashMap<>();
 
+    // Reverse indices for O(1) invalidation: pointer -> set of keys involving that pointer
+    private final Map<Integer, Set<UnaryKey>> unaryByPointer = new ConcurrentHashMap<>();
+    private final Map<Integer, Set<BinaryKey>> binaryByPointer = new ConcurrentHashMap<>();
+    private final Map<Integer, Set<TernaryKey>> ternaryByPointer = new ConcurrentHashMap<>();
+
     // Version counter - incremented on each invalidation
     private volatile long version = 0;
 
@@ -51,7 +58,9 @@ public class PredicateCache {
      * Cache result for a unary predicate.
      */
     public void putUnary(String functionName, int pointer, boolean result) {
-        unaryCache.put(new UnaryKey(functionName, pointer), result);
+        var key = new UnaryKey(functionName, pointer);
+        unaryCache.put(key, result);
+        unaryByPointer.computeIfAbsent(pointer, k -> ConcurrentHashMap.newKeySet()).add(key);
     }
 
     /**
@@ -65,7 +74,12 @@ public class PredicateCache {
      * Cache result for a binary predicate.
      */
     public void putBinary(String functionName, int pointer1, int pointer2, boolean result) {
-        binaryCache.put(new BinaryKey(functionName, pointer1, pointer2), result);
+        var key = new BinaryKey(functionName, pointer1, pointer2);
+        binaryCache.put(key, result);
+        binaryByPointer.computeIfAbsent(pointer1, k -> ConcurrentHashMap.newKeySet()).add(key);
+        if (pointer1 != pointer2) {
+            binaryByPointer.computeIfAbsent(pointer2, k -> ConcurrentHashMap.newKeySet()).add(key);
+        }
     }
 
     /**
@@ -79,18 +93,69 @@ public class PredicateCache {
      * Cache result for a ternary predicate.
      */
     public void putTernary(String functionName, int p1, int p2, int p3, boolean result) {
-        ternaryCache.put(new TernaryKey(functionName, p1, p2, p3), result);
+        var key = new TernaryKey(functionName, p1, p2, p3);
+        ternaryCache.put(key, result);
+        ternaryByPointer.computeIfAbsent(p1, k -> ConcurrentHashMap.newKeySet()).add(key);
+        if (p2 != p1) {
+            ternaryByPointer.computeIfAbsent(p2, k -> ConcurrentHashMap.newKeySet()).add(key);
+        }
+        if (p3 != p1 && p3 != p2) {
+            ternaryByPointer.computeIfAbsent(p3, k -> ConcurrentHashMap.newKeySet()).add(key);
+        }
     }
 
     /**
      * Invalidate cache entries involving the given entity pointer.
      * Called when an entity's planning variable is changed.
+     * Uses reverse index for O(1) lookup instead of O(cache_size) iteration.
      */
     public void invalidateEntity(int pointer) {
-        // Remove all entries involving this pointer
-        unaryCache.keySet().removeIf(k -> k.pointer == pointer);
-        binaryCache.keySet().removeIf(k -> k.pointer1 == pointer || k.pointer2 == pointer);
-        ternaryCache.keySet().removeIf(k -> k.p1 == pointer || k.p2 == pointer || k.p3 == pointer);
+        // Remove unary entries via reverse index
+        var unaryKeys = unaryByPointer.remove(pointer);
+        if (unaryKeys != null) {
+            for (var key : unaryKeys) {
+                unaryCache.remove(key);
+            }
+        }
+
+        // Remove binary entries via reverse index
+        var binaryKeys = binaryByPointer.remove(pointer);
+        if (binaryKeys != null) {
+            for (var key : binaryKeys) {
+                binaryCache.remove(key);
+                // Also remove from the other pointer's reverse index
+                if (key.pointer1 != pointer) {
+                    var otherSet = binaryByPointer.get(key.pointer1);
+                    if (otherSet != null) otherSet.remove(key);
+                }
+                if (key.pointer2 != pointer) {
+                    var otherSet = binaryByPointer.get(key.pointer2);
+                    if (otherSet != null) otherSet.remove(key);
+                }
+            }
+        }
+
+        // Remove ternary entries via reverse index
+        var ternaryKeys = ternaryByPointer.remove(pointer);
+        if (ternaryKeys != null) {
+            for (var key : ternaryKeys) {
+                ternaryCache.remove(key);
+                // Also remove from other pointers' reverse indices
+                if (key.p1 != pointer) {
+                    var otherSet = ternaryByPointer.get(key.p1);
+                    if (otherSet != null) otherSet.remove(key);
+                }
+                if (key.p2 != pointer) {
+                    var otherSet = ternaryByPointer.get(key.p2);
+                    if (otherSet != null) otherSet.remove(key);
+                }
+                if (key.p3 != pointer) {
+                    var otherSet = ternaryByPointer.get(key.p3);
+                    if (otherSet != null) otherSet.remove(key);
+                }
+            }
+        }
+
         version++;
     }
 
@@ -101,6 +166,9 @@ public class PredicateCache {
         unaryCache.clear();
         binaryCache.clear();
         ternaryCache.clear();
+        unaryByPointer.clear();
+        binaryByPointer.clear();
+        ternaryByPointer.clear();
         version++;
     }
 
