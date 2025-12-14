@@ -67,63 +67,13 @@ public class WasmFunction {
 
     public Object asPredicate(int tupleSize, Instance instance) {
         var wasmFunction = getExport(wasmFunctionName, instance);
-        var fn = wasmFunctionName;
+        // NO CACHING - test if cache is the problem
         return switch (tupleSize) {
-            case 1 -> (Predicate<WasmObject>) a -> {
-                var cache = SolverResource.FUNCTION_CACHE.get();
-                int p1 = a.getMemoryPointer();
-                if (cache != null) {
-                    Boolean cached = cache.getBool1(fn, p1);
-                    if (cached != null) return cached;
-                }
-                boolean result = wasmFunction.apply(p1)[0] != 0;
-                if (cache != null) cache.putBool1(fn, p1, result);
-                return result;
-            };
-            case 2 -> (BiPredicate<WasmObject, WasmObject>) (a, b) -> {
-                var cache = SolverResource.FUNCTION_CACHE.get();
-                int p1 = a.getMemoryPointer(), p2 = b.getMemoryPointer();
-                if (cache != null) {
-                    Boolean cached = cache.getBool2(fn, p1, p2);
-                    if (cached != null) return cached;
-                }
-                boolean result = wasmFunction.apply(p1, p2)[0] != 0;
-                if (cache != null) cache.putBool2(fn, p1, p2, result);
-                return result;
-            };
-            case 3 -> (TriPredicate<WasmObject, WasmObject, WasmObject>) (a, b, c) -> {
-                var cache = SolverResource.FUNCTION_CACHE.get();
-                int p1 = a.getMemoryPointer(), p2 = b.getMemoryPointer(), p3 = c.getMemoryPointer();
-                if (cache != null) {
-                    Boolean cached = cache.getBool3(fn, p1, p2, p3);
-                    if (cached != null) return cached;
-                }
-                boolean result = wasmFunction.apply(p1, p2, p3)[0] != 0;
-                if (cache != null) cache.putBool3(fn, p1, p2, p3, result);
-                return result;
-            };
-            case 4 -> (QuadPredicate<WasmObject, WasmObject, WasmObject, WasmObject>) (a, b, c, d) -> {
-                var cache = SolverResource.FUNCTION_CACHE.get();
-                int p1 = a.getMemoryPointer(), p2 = b.getMemoryPointer(), p3 = c.getMemoryPointer(), p4 = d.getMemoryPointer();
-                if (cache != null) {
-                    Boolean cached = cache.getBool4(fn, p1, p2, p3, p4);
-                    if (cached != null) return cached;
-                }
-                boolean result = wasmFunction.apply(p1, p2, p3, p4)[0] != 0;
-                if (cache != null) cache.putBool4(fn, p1, p2, p3, p4, result);
-                return result;
-            };
-            case 5 -> (PentaPredicate<WasmObject, WasmObject, WasmObject, WasmObject, WasmObject>) (a, b, c, d, e) -> {
-                var cache = SolverResource.FUNCTION_CACHE.get();
-                int p1 = a.getMemoryPointer(), p2 = b.getMemoryPointer(), p3 = c.getMemoryPointer(), p4 = d.getMemoryPointer(), p5 = e.getMemoryPointer();
-                if (cache != null) {
-                    Boolean cached = cache.getBool5(fn, p1, p2, p3, p4, p5);
-                    if (cached != null) return cached;
-                }
-                boolean result = wasmFunction.apply(p1, p2, p3, p4, p5)[0] != 0;
-                if (cache != null) cache.putBool5(fn, p1, p2, p3, p4, p5, result);
-                return result;
-            };
+            case 1 -> (Predicate<WasmObject>) a -> wasmFunction.apply(a.getMemoryPointer())[0] != 0;
+            case 2 -> (BiPredicate<WasmObject, WasmObject>) (a, b) -> wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer())[0] != 0;
+            case 3 -> (TriPredicate<WasmObject, WasmObject, WasmObject>) (a, b, c) -> wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer())[0] != 0;
+            case 4 -> (QuadPredicate<WasmObject, WasmObject, WasmObject, WasmObject>) (a, b, c, d) -> wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer(), d.getMemoryPointer())[0] != 0;
+            case 5 -> (PentaPredicate<WasmObject, WasmObject, WasmObject, WasmObject, WasmObject>) (a, b, c, d, e) -> wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer(), d.getMemoryPointer(), e.getMemoryPointer())[0] != 0;
             default -> throw new IllegalArgumentException("Unexpected value: " + tupleSize);
         };
     }
@@ -225,159 +175,47 @@ public class WasmFunction {
         return result;
     }
 
-    // ========== TO INT (weighers) ==========
+    // ========== TO INT (weighers) - NO CACHING ==========
 
     public Object asToIntFunction(int tupleSize, Instance instance) {
         var wasmFunction = getExport(wasmFunctionName, instance);
-        var fn = wasmFunctionName;
         return switch (tupleSize) {
-            case 1 -> (ToIntFunction<WasmObject>) a -> {
-                var cache = SolverResource.FUNCTION_CACHE.get();
-                int p1 = a.getMemoryPointer();
-                if (cache != null) {
-                    Integer cached = cache.getInt1(fn, p1);
-                    if (cached != null) return cached;
-                }
-                int result = (int) wasmFunction.apply(p1)[0];
-                if (cache != null) cache.putInt1(fn, p1, result);
-                return result;
-            };
-            case 2 -> (ToIntBiFunction<WasmObject, WasmObject>) (a, b) -> {
-                var cache = SolverResource.FUNCTION_CACHE.get();
-                int p1 = a.getMemoryPointer(), p2 = b.getMemoryPointer();
-                if (cache != null) {
-                    Integer cached = cache.getInt2(fn, p1, p2);
-                    if (cached != null) return cached;
-                }
-                int result = (int) wasmFunction.apply(p1, p2)[0];
-                if (cache != null) cache.putInt2(fn, p1, p2, result);
-                return result;
-            };
-            case 3 -> (ToIntTriFunction<WasmObject, WasmObject, WasmObject>) (a, b, c) -> {
-                var cache = SolverResource.FUNCTION_CACHE.get();
-                int p1 = a.getMemoryPointer(), p2 = b.getMemoryPointer(), p3 = c.getMemoryPointer();
-                if (cache != null) {
-                    Integer cached = cache.getInt3(fn, p1, p2, p3);
-                    if (cached != null) return cached;
-                }
-                int result = (int) wasmFunction.apply(p1, p2, p3)[0];
-                if (cache != null) cache.putInt3(fn, p1, p2, p3, result);
-                return result;
-            };
-            case 4 -> (ToIntQuadFunction<WasmObject, WasmObject, WasmObject, WasmObject>) (a, b, c, d) -> {
-                var cache = SolverResource.FUNCTION_CACHE.get();
-                int p1 = a.getMemoryPointer(), p2 = b.getMemoryPointer(), p3 = c.getMemoryPointer(), p4 = d.getMemoryPointer();
-                if (cache != null) {
-                    Integer cached = cache.getInt4(fn, p1, p2, p3, p4);
-                    if (cached != null) return cached;
-                }
-                int result = (int) wasmFunction.apply(p1, p2, p3, p4)[0];
-                if (cache != null) cache.putInt4(fn, p1, p2, p3, p4, result);
-                return result;
-            };
+            case 1 -> (ToIntFunction<WasmObject>) a -> (int) wasmFunction.apply(a.getMemoryPointer())[0];
+            case 2 -> (ToIntBiFunction<WasmObject, WasmObject>) (a, b) -> (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer())[0];
+            case 3 -> (ToIntTriFunction<WasmObject, WasmObject, WasmObject>) (a, b, c) -> (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer())[0];
+            case 4 -> (ToIntQuadFunction<WasmObject, WasmObject, WasmObject, WasmObject>) (a, b, c, d) -> (int) wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer(), d.getMemoryPointer())[0];
             default -> throw new IllegalArgumentException("Unexpected value: " + tupleSize);
         };
     }
 
-    // ========== TO LONG ==========
+    // ========== TO LONG - NO CACHING ==========
 
     public Object asToLongFunction(int tupleSize, Instance instance) {
         var wasmFunction = getExport(wasmFunctionName, instance);
-        var fn = wasmFunctionName;
         return switch (tupleSize) {
-            case 1 -> (ToLongFunction<WasmObject>) a -> {
-                var cache = SolverResource.FUNCTION_CACHE.get();
-                int p1 = a.getMemoryPointer();
-                if (cache != null) {
-                    Long cached = cache.getLong1(fn, p1);
-                    if (cached != null) return cached;
-                }
-                long result = wasmFunction.apply(p1)[0];
-                if (cache != null) cache.putLong1(fn, p1, result);
-                return result;
-            };
-            case 2 -> (ToLongBiFunction<WasmObject, WasmObject>) (a, b) -> {
-                var cache = SolverResource.FUNCTION_CACHE.get();
-                int p1 = a.getMemoryPointer(), p2 = b.getMemoryPointer();
-                if (cache != null) {
-                    Long cached = cache.getLong2(fn, p1, p2);
-                    if (cached != null) return cached;
-                }
-                long result = wasmFunction.apply(p1, p2)[0];
-                if (cache != null) cache.putLong2(fn, p1, p2, result);
-                return result;
-            };
-            case 3 -> (ToLongTriFunction<WasmObject, WasmObject, WasmObject>) (a, b, c) -> {
-                var cache = SolverResource.FUNCTION_CACHE.get();
-                int p1 = a.getMemoryPointer(), p2 = b.getMemoryPointer(), p3 = c.getMemoryPointer();
-                if (cache != null) {
-                    Long cached = cache.getLong3(fn, p1, p2, p3);
-                    if (cached != null) return cached;
-                }
-                long result = wasmFunction.apply(p1, p2, p3)[0];
-                if (cache != null) cache.putLong3(fn, p1, p2, p3, result);
-                return result;
-            };
-            case 4 -> (ToLongQuadFunction<WasmObject, WasmObject, WasmObject, WasmObject>) (a, b, c, d) -> {
-                var cache = SolverResource.FUNCTION_CACHE.get();
-                int p1 = a.getMemoryPointer(), p2 = b.getMemoryPointer(), p3 = c.getMemoryPointer(), p4 = d.getMemoryPointer();
-                if (cache != null) {
-                    Long cached = cache.getLong4(fn, p1, p2, p3, p4);
-                    if (cached != null) return cached;
-                }
-                long result = wasmFunction.apply(p1, p2, p3, p4)[0];
-                if (cache != null) cache.putLong4(fn, p1, p2, p3, p4, result);
-                return result;
-            };
+            case 1 -> (ToLongFunction<WasmObject>) a -> wasmFunction.apply(a.getMemoryPointer())[0];
+            case 2 -> (ToLongBiFunction<WasmObject, WasmObject>) (a, b) -> wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer())[0];
+            case 3 -> (ToLongTriFunction<WasmObject, WasmObject, WasmObject>) (a, b, c) -> wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer())[0];
+            case 4 -> (ToLongQuadFunction<WasmObject, WasmObject, WasmObject, WasmObject>) (a, b, c, d) -> wasmFunction.apply(a.getMemoryPointer(), b.getMemoryPointer(), c.getMemoryPointer(), d.getMemoryPointer())[0];
             default -> throw new IllegalArgumentException("Unexpected value: " + tupleSize);
         };
     }
 
-    // ========== COMPARATOR/RELATION/HASHER (used for custom equals) ==========
+    // ========== COMPARATOR/RELATION/HASHER - NO CACHING ==========
 
     private Comparator<Integer> getComparator(Instance instance) {
         var wasmComparator = getExport(comparatorFunctionName, instance);
-        var fn = comparatorFunctionName;
-        return (a, b) -> {
-            var cache = SolverResource.FUNCTION_CACHE.get();
-            if (cache != null) {
-                Integer cached = cache.getInt2(fn, a, b);
-                if (cached != null) return cached;
-            }
-            int result = (int) wasmComparator.apply(a, b)[0];
-            if (cache != null) cache.putInt2(fn, a, b, result);
-            return result;
-        };
+        return (a, b) -> (int) wasmComparator.apply(a, b)[0];
     }
 
     private BiPredicate<Integer, Integer> getRelation(Instance instance) {
         var wasmRelation = getExport(relationFunctionName, instance);
-        var fn = relationFunctionName;
-        return (a, b) -> {
-            var cache = SolverResource.FUNCTION_CACHE.get();
-            if (cache != null) {
-                Boolean cached = cache.getBool2(fn, a, b);
-                if (cached != null) return cached;
-            }
-            boolean result = wasmRelation.apply(a, b)[0] != 0;
-            if (cache != null) cache.putBool2(fn, a, b, result);
-            return result;
-        };
+        return (a, b) -> wasmRelation.apply(a, b)[0] != 0;
     }
 
     private ToIntFunction<Integer> getHasher(Instance instance) {
         var wasmHasher = getExport(hashFunctionName, instance);
-        var fn = hashFunctionName;
-        return a -> {
-            var cache = SolverResource.FUNCTION_CACHE.get();
-            if (cache != null) {
-                Integer cached = cache.getInt1(fn, a);
-                if (cached != null) return cached;
-            }
-            int result = (int) wasmHasher.apply(a)[0];
-            if (cache != null) cache.putInt1(fn, a, result);
-            return result;
-        };
+        return a -> (int) wasmHasher.apply(a)[0];
     }
 
     public String getWasmFunctionName() {
