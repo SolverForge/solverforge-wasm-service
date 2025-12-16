@@ -48,6 +48,8 @@
     <maven.compiler.source>24</maven.compiler.source>
     <maven.compiler.target>24</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- Build uber-jar for single-file distribution -->
+    <quarkus.package.jar.type>uber-jar</quarkus.package.jar.type>
   </properties>
 
   <dependencyManagement>
