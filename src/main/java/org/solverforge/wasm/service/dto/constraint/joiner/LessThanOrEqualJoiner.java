@@ -1,0 +1,27 @@
+package org.solverforge.wasm.service.dto.constraint.joiner;
+
+import org.solverforge.wasm.service.dto.WasmFunction;
+
+import org.jspecify.annotations.Nullable;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+public final class LessThanOrEqualJoiner extends AbstractComparisonJoiner implements DataJoiner {
+    public LessThanOrEqualJoiner() {
+
+    }
+
+    @JsonCreator
+    public LessThanOrEqualJoiner(@Nullable @JsonProperty("map") WasmFunction map,
+            @Nullable @JsonProperty("leftMap") WasmFunction leftMap,
+            @Nullable @JsonProperty("rightMap") WasmFunction rightMap,
+            @JsonProperty("map") WasmFunction comparator) {
+        super(map, leftMap, rightMap, comparator);
+    }
+
+    @Override
+    public String relation() {
+        return "lessThanOrEqual";
+    }
+}

@@ -1,0 +1,27 @@
+package org.solverforge.wasm.service.classgen;
+
+import java.lang.classfile.ClassBuilder;
+import java.lang.classfile.CodeBuilder;
+import java.lang.constant.ClassDesc;
+
+import org.solverforge.wasm.service.dto.WasmFunction;
+import org.solverforge.wasm.service.dto.constraint.DataStream;
+
+public record DataStreamInfo(
+                      ConstraintProviderClassGenerator constraintProviderClassGenerator,
+                      ClassBuilder classBuilder,
+                      CodeBuilder codeBuilder,
+                      DataStream dataStream,
+                      ClassDesc generatedClassDesc) {
+    public ClassDesc loadFunction(FunctionType functionType, WasmFunction function) {
+        return constraintProviderClassGenerator.loadFunction(this, functionType, function);
+    }
+
+    public ClassDesc loadFunctionWithExtras(FunctionType functionType, WasmFunction function, int extras) {
+        return constraintProviderClassGenerator.loadFunctionWithExtras(this, extras, functionType, function);
+    }
+
+    public ClassDesc loadFunctionOfSize(FunctionType functionType, WasmFunction function, int argCount) {
+        return constraintProviderClassGenerator.loadFunctionOfSize(this, argCount, functionType, function);
+    }
+}

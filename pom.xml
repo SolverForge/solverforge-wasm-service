@@ -30,9 +30,9 @@
   </developers>
 
   <scm>
-    <connection>scm:git:git://github.com/SolverForge/timefold-wasm-service.git</connection>
-    <developerConnection>scm:git:ssh://github.com:SolverForge/timefold-wasm-service.git</developerConnection>
-    <url>https://github.com/SolverForge/timefold-wasm-service</url>
+    <connection>scm:git:git://github.com/SolverForge/solverforge-wasm-service.git</connection>
+    <developerConnection>scm:git:ssh://github.com:SolverForge/solverforge-wasm-service.git</developerConnection>
+    <url>https://github.com/SolverForge/solverforge-wasm-service</url>
   </scm>
 
   <properties>

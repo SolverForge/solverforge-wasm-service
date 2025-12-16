@@ -1,0 +1,11 @@
+SolverForge WASM Service
+Copyright 2024-2025 SolverForge
+
+This product includes software developed at SolverForge (https://solverforge.org/).
+
+This product is derived from timefold-wasm-service, originally created by
+Christopher Chianelli and licensed under the Apache License 2.0.
+Original source: https://github.com/Christopher-Chianelli/timefold-wasm-service
+
+This product uses Timefold Solver (https://timefold.ai/), licensed under
+the Apache License 2.0.

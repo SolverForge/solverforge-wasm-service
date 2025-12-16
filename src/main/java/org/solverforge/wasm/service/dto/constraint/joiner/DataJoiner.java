@@ -1,0 +1,13 @@
+package org.solverforge.wasm.service.dto.constraint.joiner;
+
+import org.solverforge.wasm.service.classgen.DataStreamInfo;
+
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
+
+@JsonTypeInfo(use=JsonTypeInfo.Id.CUSTOM, property="relation", visible=true)
+@JsonTypeIdResolver(DataJoinerTypeIdResolver.class)
+public sealed interface DataJoiner permits LessThanJoiner, GreaterThanJoiner, LessThanOrEqualJoiner, GreaterThanOrEqualJoiner, EqualJoiner, FilteringJoiner, OverlappingJoiner {
+    String relation();
+    void loadJoinerInstance(DataStreamInfo dataStreamInfo);
+}

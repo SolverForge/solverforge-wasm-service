@@ -1,0 +1,43 @@
+package org.solverforge.wasm.service.dto.constraint.groupby;
+
+import static org.solverforge.wasm.service.classgen.DomainObjectClassGenerator.getDescriptor;
+
+import java.lang.constant.MethodTypeDesc;
+
+import ai.timefold.solver.core.api.score.stream.ConstraintCollectors;
+import org.solverforge.wasm.service.classgen.DataStreamInfo;
+import org.solverforge.wasm.service.classgen.FunctionType;
+import org.solverforge.wasm.service.dto.WasmFunction;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+public record MinAggregator(
+        @JsonProperty("map") WasmFunction map,
+        @JsonProperty("comparator") String comparator) implements Aggregator{
+
+    public MinAggregator {
+        if (map != null) {
+            map.setComparatorFunctionName(comparator);
+        }
+    }
+
+    public MinAggregator() {
+        this(null, null);
+    }
+
+    @Override
+    public String name() {
+        return "min";
+    }
+
+    @Override
+    public void loadAggregatorInstance(DataStreamInfo dataStreamInfo) {
+        var codeBuilder = dataStreamInfo.codeBuilder();
+        var constraintCollectorDesc = getDescriptor(dataStreamInfo.dataStream().getConstraintCollectorClass());
+        dataStreamInfo.loadFunction(FunctionType.MAPPER, map);
+
+        codeBuilder.invokestatic(getDescriptor(ConstraintCollectors.class), "min",
+                MethodTypeDesc.of(constraintCollectorDesc,
+                        getDescriptor(dataStreamInfo.dataStream().getFunctionClass())));
+    }
+}
