@@ -4,9 +4,36 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>ai.timefold</groupId>
-  <artifactId>timefold-wasm-service</artifactId>
+  <groupId>org.solverforge</groupId>
+  <artifactId>solverforge-wasm-service</artifactId>
   <version>0.2.0</version>
+  <packaging>jar</packaging>
+
+  <name>SolverForge WASM Service</name>
+  <description>WASM-based constraint solver service for SolverForge</description>
+  <url>https://solverforge.org</url>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <name>SolverForge Team</name>
+      <email>info@solverforge.org</email>
+      <organization>SolverForge</organization>
+      <organizationUrl>https://solverforge.org</organizationUrl>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:git://github.com/SolverForge/timefold-wasm-service.git</connection>
+    <developerConnection>scm:git:ssh://github.com:SolverForge/timefold-wasm-service.git</developerConnection>
+    <url>https://github.com/SolverForge/timefold-wasm-service</url>
+  </scm>
 
   <properties>
     <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
