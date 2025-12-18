@@ -14,6 +14,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import ai.timefold.solver.core.api.score.Score;
+import ai.timefold.solver.core.api.score.buildin.bendable.BendableScore;
 import ai.timefold.solver.core.api.score.buildin.hardmediumsoft.HardMediumSoftScore;
 import ai.timefold.solver.core.api.score.buildin.hardsoft.HardSoftScore;
 import ai.timefold.solver.core.api.score.buildin.hardsoftbigdecimal.HardSoftBigDecimalScore;
@@ -71,6 +72,7 @@ public class ConstraintProviderClassGenerator {
                             case "HardSoftScore" -> HardSoftScore.class;
                             case "HardMediumSoftScore" -> HardMediumSoftScore.class;
                             case "HardSoftBigDecimalScore" -> HardSoftBigDecimalScore.class;
+                            case "BendableScore" -> BendableScore.class;
                             default -> {
                                 throw new IllegalArgumentException("Unknown score type: " + field.getValue().getType());
                             }

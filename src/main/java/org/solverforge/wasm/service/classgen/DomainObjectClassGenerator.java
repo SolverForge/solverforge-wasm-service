@@ -28,6 +28,7 @@ import java.util.function.Consumer;
 
 import ai.timefold.solver.core.api.domain.entity.PlanningEntity;
 import ai.timefold.solver.core.api.domain.solution.PlanningSolution;
+import ai.timefold.solver.core.api.score.buildin.bendable.BendableScore;
 import ai.timefold.solver.core.api.score.buildin.hardmediumsoft.HardMediumSoftScore;
 import ai.timefold.solver.core.api.score.buildin.hardsoft.HardSoftScore;
 import ai.timefold.solver.core.api.score.buildin.simple.SimpleScore;
@@ -81,6 +82,7 @@ public class DomainObjectClassGenerator {
             case "SimpleScore" -> getDescriptor(SimpleScore.class);
             case "HardSoftScore" -> getDescriptor(HardSoftScore.class);
             case "HardMediumSoftScore" -> getDescriptor(HardMediumSoftScore.class);
+            case "BendableScore" -> getDescriptor(BendableScore.class);
             default -> ClassDesc.ofInternalName(wasmType);
         };
     }
