@@ -875,14 +875,43 @@ public class HostFunctionProvider {
      * hinsert(list: i32, index: i32, item: i32)
      *
      * Inserts an item at the specified index in a list.
-     * Not implemented - only needed for list planning variables.
+     * Shifts elements at [index, size) to [index+1, size+1).
      */
     private HostFunction createInsert() {
         return new HostFunction("host", "hinsert",
                 FunctionType.of(List.of(ValType.I32, ValType.I32, ValType.I32), List.of()),
                 (instance, args) -> {
-                    // Not needed for simple planning variables
-                    throw new UnsupportedOperationException();
+                    var alloc = instance.export("alloc");
+                    var listInstance = (int) args[0];
+                    var index = (int) args[1];
+                    var item = (int) args[2];
+
+                    var oldSize = (int) instance.memory().readI32(listInstance + SIZE_OFFSET);
+                    var newSize = oldSize + 1;
+                    var capacity = (int) instance.memory().readI32(listInstance + CAPACITY_OFFSET);
+                    var backingArray = (int) instance.memory().readI32(listInstance + BACKING_ARRAY_OFFSET);
+
+                    // Grow if needed
+                    if (newSize > capacity) {
+                        var newCapacity = Math.max(newSize, capacity * 2);
+                        var newBackingArray = (int) alloc.apply((long) WORD_SIZE * newCapacity)[0];
+                        instance.memory().copy(newBackingArray, backingArray, oldSize * WORD_SIZE);
+                        instance.memory().writeI32(listInstance + CAPACITY_OFFSET, newCapacity);
+                        instance.memory().writeI32(listInstance + BACKING_ARRAY_OFFSET, newBackingArray);
+                        backingArray = newBackingArray;
+                    }
+
+                    // Shift elements at [index, oldSize) to [index+1, newSize)
+                    for (int i = oldSize - 1; i >= index; i--) {
+                        var val = instance.memory().readI32(backingArray + i * WORD_SIZE);
+                        instance.memory().writeI32(backingArray + (i + 1) * WORD_SIZE, val);
+                    }
+
+                    // Insert item at index
+                    instance.memory().writeI32(backingArray + index * WORD_SIZE, item);
+                    instance.memory().writeI32(listInstance + SIZE_OFFSET, newSize);
+
+                    return new long[] {};
                 });
     }
 
@@ -890,14 +919,27 @@ public class HostFunctionProvider {
      * hremove(list: i32, index: i32)
      *
      * Removes an item at the specified index from a list.
-     * Not implemented - only needed for list planning variables.
+     * Shifts elements at [index+1, size) to [index, size-1).
      */
     private HostFunction createRemove() {
         return new HostFunction("host", "hremove",
                 FunctionType.of(List.of(ValType.I32, ValType.I32), List.of()),
                 (instance, args) -> {
-                    // Not needed for simple planning variables
-                    throw new UnsupportedOperationException();
+                    var listInstance = (int) args[0];
+                    var index = (int) args[1];
+
+                    var oldSize = (int) instance.memory().readI32(listInstance + SIZE_OFFSET);
+                    var backingArray = (int) instance.memory().readI32(listInstance + BACKING_ARRAY_OFFSET);
+
+                    // Shift elements at [index+1, oldSize) to [index, oldSize-1)
+                    for (int i = index; i < oldSize - 1; i++) {
+                        var val = instance.memory().readI32(backingArray + (i + 1) * WORD_SIZE);
+                        instance.memory().writeI32(backingArray + i * WORD_SIZE, val);
+                    }
+
+                    instance.memory().writeI32(listInstance + SIZE_OFFSET, oldSize - 1);
+
+                    return new long[] {};
                 });
     }
 
