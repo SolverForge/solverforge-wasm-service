@@ -90,7 +90,8 @@ public class PlanningProblemDeserializationTest {
                         "dealloc"
                 ),
                 "abcd",
-                new PlanningTermination().withSpentLimit("1s")
+                new PlanningTermination().withSpentLimit("1s"),
+                null
         );
         assertThat((Object) objectMapper.readerFor(PlanningProblem.class).readValue(
                    """
