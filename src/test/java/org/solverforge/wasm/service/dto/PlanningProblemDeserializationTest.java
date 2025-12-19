@@ -36,21 +36,21 @@ public class PlanningProblemDeserializationTest {
     public void testDeserialize() throws IOException {
         var employeeFields = new LinkedHashMap<String, FieldDescriptor>();
         employeeFields.put("name", new FieldDescriptor("String", null));
-        var employee = new DomainObject(employeeFields, null);
+        var employee = new DomainObject(employeeFields, null, null);
         employee.setName("Employee");
 
         var shiftFields = new LinkedHashMap<String, FieldDescriptor>();
         shiftFields.put("start", new FieldDescriptor("int", null));
         shiftFields.put("end", new FieldDescriptor("int", null));
         shiftFields.put("employee", new FieldDescriptor("Employee", new DomainAccessor("getEmployee", "setEmployee"), List.of(new DomainPlanningVariable(false))));
-        var shift = new DomainObject(shiftFields, null);
+        var shift = new DomainObject(shiftFields, null, null);
         shift.setName("Shift");
 
         var scheduleFields = new LinkedHashMap<String, FieldDescriptor>();
         scheduleFields.put("employees", new FieldDescriptor("Employee[]", new DomainAccessor("getEmployees", "setEmployees"), List.of(new DomainProblemFactCollectionProperty(), new DomainValueRangeProvider())));
         scheduleFields.put("shifts", new FieldDescriptor("Shift[]", new DomainAccessor("getShifts", "setShifts"), List.of(new DomainPlanningEntityCollectionProperty())));
         scheduleFields.put("score", new FieldDescriptor("SimpleScore", List.of(new DomainPlanningScore())));
-        var schedule = new DomainObject(scheduleFields, new DomainObjectMapper("strToSchedule", "scheduleToStr"));
+        var schedule = new DomainObject(scheduleFields, new DomainObjectMapper("strToSchedule", "scheduleToStr"), null);
         schedule.setName("Schedule");
 
         var constraints = Map.of(

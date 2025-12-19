@@ -53,9 +53,9 @@ public class TestUtils {
         scheduleFields.put("score", new FieldDescriptor("SimpleScore", List.of(new DomainPlanningScore())));
 
         var domainObjects = new LinkedHashMap<String, DomainObject>();
-        domainObjects.put("Employee", new DomainObject(employeeFields, null));
-        domainObjects.put("Shift", new DomainObject(shiftFields, null));
-        domainObjects.put("Schedule", new DomainObject(scheduleFields, new DomainObjectMapper("parseSchedule", "scheduleString")));
+        domainObjects.put("Employee", new DomainObject(employeeFields, null, null));
+        domainObjects.put("Shift", new DomainObject(shiftFields, null, null));
+        domainObjects.put("Schedule", new DomainObject(scheduleFields, new DomainObjectMapper("parseSchedule", "scheduleString"), null));
 
         return new PlanningProblem(
                 domainObjects,

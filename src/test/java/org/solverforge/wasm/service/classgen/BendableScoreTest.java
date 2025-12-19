@@ -88,10 +88,10 @@ public class BendableScoreTest {
                 List.of(new DomainPlanningScore(hardLevels, softLevels))));
 
         var domainObjects = new LinkedHashMap<String, DomainObject>();
-        domainObjects.put("Employee", new DomainObject(employeeFields, null));
-        domainObjects.put("Shift", new DomainObject(shiftFields, null));
+        domainObjects.put("Employee", new DomainObject(employeeFields, null, null));
+        domainObjects.put("Shift", new DomainObject(shiftFields, null, null));
         domainObjects.put("Schedule", new DomainObject(scheduleFields,
-                new DomainObjectMapper("parseSchedule", "scheduleString")));
+                new DomainObjectMapper("parseSchedule", "scheduleString"), null));
 
         // Get the base WASM module from TestUtils and reuse it
         var baseProblem = TestUtils.getPlanningProblem();

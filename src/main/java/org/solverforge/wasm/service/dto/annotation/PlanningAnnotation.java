@@ -12,8 +12,9 @@ import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
 @JsonTypeInfo(use=JsonTypeInfo.Id.CUSTOM, property="annotation", visible=true)
 @JsonTypeIdResolver(AnnotationTypeIdResolver.class)
 public sealed interface PlanningAnnotation
-        permits DomainPlanningEntityCollectionProperty, DomainPlanningId, DomainPlanningListVariable,
-        DomainPlanningScore, DomainPlanningVariable, DomainProblemFactCollectionProperty, DomainValueRangeProvider {
+        permits DomainInverseRelationShadowVariable, DomainPlanningEntityCollectionProperty, DomainPlanningId,
+        DomainPlanningListVariable, DomainPlanningScore, DomainPlanningVariable, DomainProblemFactCollectionProperty,
+        DomainValueRangeProvider {
     @JsonIgnore
     Class<? extends Annotation> annotationClass();
     default String annotation() {
@@ -33,5 +34,10 @@ public sealed interface PlanningAnnotation
     @JsonIgnore
     default List<AnnotationElement> getAnnotationElements() {
         return Collections.emptyList();
+    }
+
+    @JsonIgnore
+    default boolean isShadowVariable() {
+        return false;
     }
 }

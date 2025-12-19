@@ -88,6 +88,19 @@ public class PlanningProblem {
             var domainObject = entry.getValue();
             domainObject.setName(className);
 
+            // Check class-level annotations first
+            if (domainObject.isPlanningEntity() && !entityClassList.contains(className)) {
+                entityClassList.add(className);
+            }
+            if (domainObject.isPlanningSolution()) {
+                if (solutionClass == null) {
+                    solutionClass = className;
+                } else if (!solutionClass.equals(className)) {
+                    throw new IllegalStateException("Multiple solution classes found (%s) and (%s).".formatted(solutionClass, className));
+                }
+            }
+
+            // Also check field-level annotations (for backward compatibility)
             for (var field : domainObject.fieldDescriptorMap.values()) {
                 if (field.annotations != null) {
                     for (var annotation : field.annotations) {

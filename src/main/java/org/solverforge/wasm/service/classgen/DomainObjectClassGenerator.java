@@ -156,8 +156,9 @@ public class DomainObjectClassGenerator {
 
 
         var classBytes = classFile.build(ClassDesc.of(domainObject.getName()), classBuilder -> {
-            var isPlanningEntity = false;
-            var isPlanningSolution = false;
+            // Check class-level annotations first
+            var isPlanningEntity = domainObject.isPlanningEntity();
+            var isPlanningSolution = domainObject.isPlanningSolution();
             classBuilder.withSuperclass(wasmObjectDesc);
 
             // No-args constructor
@@ -257,14 +258,17 @@ public class DomainObjectClassGenerator {
 
                 var isPlanningScore = false;
                 var isPlanningVariable = false;
+                var isShadowVariable = false;
                 for (var annotation : annotations) {
                     isPlanningEntity |= annotation.definesPlanningEntity();
                     isPlanningSolution |= annotation.definesPlanningSolution();
                     isPlanningScore |= annotation instanceof DomainPlanningScore;
                     isPlanningVariable |= annotation instanceof DomainPlanningVariable;
+                    isShadowVariable |= annotation.isShadowVariable();
                 }
                 var finalIsPlanningScore = isPlanningScore;
                 var finalIsPlanningVariable = isPlanningVariable;
+                var finalIsShadowVariable = isShadowVariable;
 
                 var wrapperTypeDesc = getWasmWrapperTypeDesc(field.getValue().getType());
                 classBuilder.withField(field.getKey(), wrapperTypeDesc, ClassFile.ACC_PRIVATE);
@@ -349,7 +353,8 @@ public class DomainObjectClassGenerator {
                                     codeBuilder.invokevirtual(wasmObjectDesc, "invalidateFunctionCache", MethodTypeDesc.of(voidDesc));
                                 }
 
-                                if (finalIsPlanningScore) {
+                                // Shadow variables are managed by the solver, no WASM sync needed
+                                if (finalIsPlanningScore || finalIsShadowVariable) {
                                     codeBuilder.return_();
                                 } else {
                                     if (field.getValue().getAccessor() != null && field.getValue().getAccessor().setterFunctionName() != null) {
