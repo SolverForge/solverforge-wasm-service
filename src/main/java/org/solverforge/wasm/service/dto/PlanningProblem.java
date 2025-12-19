@@ -45,6 +45,14 @@ public class PlanningProblem {
     @JsonProperty("termination")
     PlanningTermination terminationConfig;
 
+    /**
+     * Pre-computed method results for methods that couldn't be inlined.
+     * Maps method_hash to a table of (object_key -> result).
+     * Object keys are strings like "ptr1_ptr2" for 2-arg methods.
+     */
+    @JsonProperty("precomputed")
+    @Nullable Map<Integer, Map<String, Integer>> precomputed;
+
     @JsonCreator
     public PlanningProblem(@JsonProperty("domain")  Map<String, DomainObject> domainObjectMap,
             @JsonProperty("constraints") Map<String, WasmConstraint> constraintList,
@@ -55,7 +63,8 @@ public class PlanningProblem {
             @Nullable @JsonProperty("solutionDeallocator") String solutionDeallocator,
             @JsonProperty("listAccessor")  DomainListAccessor listAccessor,
             @JsonProperty("problem") String problem,
-            @Nullable @JsonProperty("termination") PlanningTermination terminationConfig) {
+            @Nullable @JsonProperty("termination") PlanningTermination terminationConfig,
+            @Nullable @JsonProperty("precomputed") Map<Integer, Map<String, Integer>> precomputed) {
         this.domainObjectMap = domainObjectMap;
         this.constraintList = constraintList.entrySet()
                 .stream()
@@ -71,6 +80,7 @@ public class PlanningProblem {
         this.solutionDeallocator = (solutionDeallocator != null)? solutionDeallocator : deallocator;
         this.listAccessor = listAccessor;
         this.terminationConfig = (terminationConfig != null)? terminationConfig : new PlanningTermination().withDiminishedReturns(new PlanningDiminishedReturns());
+        this.precomputed = precomputed;
 
         entityClassList = new ArrayList<>();
         for (var entry : domainObjectMap.entrySet()) {
@@ -163,5 +173,13 @@ public class PlanningProblem {
 
     public EnvironmentMode getEnvironmentMode() {
         return environmentMode;
+    }
+
+    /**
+     * Get pre-computed method results for methods that couldn't be inlined.
+     * @return Map from method_hash to (object_key -> result), or null if none
+     */
+    public @Nullable Map<Integer, Map<String, Integer>> getPrecomputed() {
+        return precomputed;
     }
 }

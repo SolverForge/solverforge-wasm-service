@@ -46,10 +46,18 @@ public class HostFunctionProvider {
 
     private final ObjectMapper objectMapper;
     private final Map<String, DomainObject> domainObjectMap;
+    /**
+     * Pre-computed method results indexed by method hash.
+     * Each entry maps object key (e.g., "ptr1_ptr2") to result value.
+     */
+    private final Map<Integer, Map<String, Integer>> precomputed;
 
     public HostFunctionProvider(ObjectMapper objectMapper, PlanningProblem planningProblem) {
         this.objectMapper = objectMapper;
         this.domainObjectMap = planningProblem.getDomainObjectMap();
+        this.precomputed = planningProblem.getPrecomputed() != null
+            ? planningProblem.getPrecomputed()
+            : new HashMap<>();
     }
 
     /**
@@ -70,7 +78,10 @@ public class HostFunctionProvider {
                 createRemove(),
                 createRound(),
                 createStringEquals(),
-                createListContainsString()
+                createListContainsString(),
+                createPrecomputed0(),
+                createPrecomputed1(),
+                createPrecomputed2()
         );
     }
 
@@ -989,6 +1000,86 @@ public class HostFunctionProvider {
                     }
 
                     return new long[] { 0 };
+                });
+    }
+
+    // ========== Pre-computed Method Lookups ==========
+
+    /**
+     * hprecomputed0(methodId: i32, objectPtr: i32) -> i32
+     *
+     * Looks up a pre-computed value for a method with no arguments (besides self).
+     * The key is formed from just the object pointer.
+     */
+    private HostFunction createPrecomputed0() {
+        return new HostFunction("host", "hprecomputed0",
+                FunctionType.of(List.of(ValType.I32, ValType.I32), List.of(ValType.I32)),
+                (instance, args) -> {
+                    int methodId = (int) args[0];
+                    int objectPtr = (int) args[1];
+
+                    Map<String, Integer> methodValues = precomputed.get(methodId);
+                    if (methodValues == null) {
+                        // No pre-computed values for this method
+                        return new long[] { 0 };
+                    }
+
+                    String key = String.valueOf(objectPtr);
+                    Integer result = methodValues.get(key);
+                    return new long[] { result != null ? result : 0 };
+                });
+    }
+
+    /**
+     * hprecomputed1(methodId: i32, objectPtr: i32, arg1Ptr: i32) -> i32
+     *
+     * Looks up a pre-computed value for a method with 1 argument (besides self).
+     * The key is formed from object pointer and arg1 pointer.
+     */
+    private HostFunction createPrecomputed1() {
+        return new HostFunction("host", "hprecomputed1",
+                FunctionType.of(List.of(ValType.I32, ValType.I32, ValType.I32), List.of(ValType.I32)),
+                (instance, args) -> {
+                    int methodId = (int) args[0];
+                    int objectPtr = (int) args[1];
+                    int arg1Ptr = (int) args[2];
+
+                    Map<String, Integer> methodValues = precomputed.get(methodId);
+                    if (methodValues == null) {
+                        // No pre-computed values for this method
+                        return new long[] { 0 };
+                    }
+
+                    String key = objectPtr + "_" + arg1Ptr;
+                    Integer result = methodValues.get(key);
+                    return new long[] { result != null ? result : 0 };
+                });
+    }
+
+    /**
+     * hprecomputed2(methodId: i32, objectPtr: i32, arg1Ptr: i32, arg2Ptr: i32) -> i32
+     *
+     * Looks up a pre-computed value for a method with 2 arguments (besides self).
+     * The key is formed from object pointer and both arg pointers.
+     */
+    private HostFunction createPrecomputed2() {
+        return new HostFunction("host", "hprecomputed2",
+                FunctionType.of(List.of(ValType.I32, ValType.I32, ValType.I32, ValType.I32), List.of(ValType.I32)),
+                (instance, args) -> {
+                    int methodId = (int) args[0];
+                    int objectPtr = (int) args[1];
+                    int arg1Ptr = (int) args[2];
+                    int arg2Ptr = (int) args[3];
+
+                    Map<String, Integer> methodValues = precomputed.get(methodId);
+                    if (methodValues == null) {
+                        // No pre-computed values for this method
+                        return new long[] { 0 };
+                    }
+
+                    String key = objectPtr + "_" + arg1Ptr + "_" + arg2Ptr;
+                    Integer result = methodValues.get(key);
+                    return new long[] { result != null ? result : 0 };
                 });
     }
 }
