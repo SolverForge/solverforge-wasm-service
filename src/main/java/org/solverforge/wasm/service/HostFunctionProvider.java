@@ -70,8 +70,7 @@ public class HostFunctionProvider {
                 createRemove(),
                 createRound(),
                 createStringEquals(),
-                createListContainsString(),
-                createDrivingTime()
+                createListContainsString()
         );
     }
 
@@ -991,88 +990,5 @@ public class HostFunctionProvider {
 
                     return new long[] { 0 };
                 });
-    }
-
-    // ========== Driving Time Calculation ==========
-
-    // Earth radius in meters
-    private static final double EARTH_RADIUS_M = 6_371_000.0;
-    private static final double TWICE_EARTH_RADIUS_M = 2.0 * EARTH_RADIUS_M;
-    // Average driving speed assumption: 50 km/h
-    private static final double AVERAGE_SPEED_KMPH = 50.0;
-
-    /**
-     * hdrivingTime(loc1Ptr: i32, loc2Ptr: i32) -> i32
-     *
-     * Calculates the driving time in seconds between two locations.
-     * Uses the Haversine formula to compute great-circle distance,
-     * then converts to driving time assuming average speed.
-     *
-     * Location structure expected:
-     * - latitude: f64 (offset 0)
-     * - longitude: f64 (offset 8)
-     */
-    private HostFunction createDrivingTime() {
-        return new HostFunction("host", "hdrivingTime",
-                FunctionType.of(List.of(ValType.I32, ValType.I32), List.of(ValType.I32)),
-                (instance, args) -> {
-                    int loc1Ptr = (int) args[0];
-                    int loc2Ptr = (int) args[1];
-
-                    // Read lat/lon from memory (assuming f64 for precise coordinates)
-                    double lat1 = instance.memory().readDouble(loc1Ptr);
-                    double lon1 = instance.memory().readDouble(loc1Ptr + 8);
-                    double lat2 = instance.memory().readDouble(loc2Ptr);
-                    double lon2 = instance.memory().readDouble(loc2Ptr + 8);
-
-                    // Calculate driving time using Haversine
-                    int drivingTimeSeconds = calculateDrivingTimeHaversine(lat1, lon1, lat2, lon2);
-                    return new long[] { drivingTimeSeconds };
-                });
-    }
-
-    /**
-     * Calculate driving time in seconds using the Haversine formula.
-     *
-     * Algorithm:
-     * 1. Convert lat/long to 3D Cartesian coordinates on a unit sphere
-     * 2. Calculate Euclidean distance between the two points
-     * 3. Use the arc sine formula to get the great-circle distance
-     * 4. Convert meters to driving seconds assuming average speed
-     */
-    private int calculateDrivingTimeHaversine(double lat1, double lon1, double lat2, double lon2) {
-        // Same location check
-        if (lat1 == lat2 && lon1 == lon2) {
-            return 0;
-        }
-
-        // Convert to 3D Cartesian coordinates
-        double[] from = toCartesian(lat1, lon1);
-        double[] to = toCartesian(lat2, lon2);
-
-        // Calculate Euclidean distance
-        double dx = from[0] - to[0];
-        double dy = from[1] - to[1];
-        double dz = from[2] - to[2];
-        double r = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-        // Great-circle distance in meters
-        double distanceMeters = TWICE_EARTH_RADIUS_M * Math.asin(r);
-
-        // Convert meters to driving seconds: seconds = meters / (km/h) * 3.6
-        return (int) Math.round(distanceMeters / AVERAGE_SPEED_KMPH * 3.6);
-    }
-
-    /**
-     * Convert latitude/longitude to 3D Cartesian coordinates on a unit sphere.
-     */
-    private double[] toCartesian(double latitude, double longitude) {
-        double latRad = Math.toRadians(latitude);
-        double lonRad = Math.toRadians(longitude);
-        // Cartesian coordinates, normalized for a sphere of diameter 1.0
-        double x = 0.5 * Math.cos(latRad) * Math.sin(lonRad);
-        double y = 0.5 * Math.cos(latRad) * Math.cos(lonRad);
-        double z = 0.5 * Math.sin(latRad);
-        return new double[] { x, y, z };
     }
 }
