@@ -903,7 +903,7 @@ public class HostFunctionProvider {
 
                     // Shift elements at [index, oldSize) to [index+1, newSize)
                     for (int i = oldSize - 1; i >= index; i--) {
-                        var val = instance.memory().readI32(backingArray + i * WORD_SIZE);
+                        var val = (int) instance.memory().readI32(backingArray + i * WORD_SIZE);
                         instance.memory().writeI32(backingArray + (i + 1) * WORD_SIZE, val);
                     }
 
@@ -933,7 +933,7 @@ public class HostFunctionProvider {
 
                     // Shift elements at [index+1, oldSize) to [index, oldSize-1)
                     for (int i = index; i < oldSize - 1; i++) {
-                        var val = instance.memory().readI32(backingArray + (i + 1) * WORD_SIZE);
+                        var val = (int) instance.memory().readI32(backingArray + (i + 1) * WORD_SIZE);
                         instance.memory().writeI32(backingArray + i * WORD_SIZE, val);
                     }
 
