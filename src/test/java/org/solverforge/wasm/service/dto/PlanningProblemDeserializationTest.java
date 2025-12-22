@@ -42,7 +42,7 @@ public class PlanningProblemDeserializationTest {
         var shiftFields = new LinkedHashMap<String, FieldDescriptor>();
         shiftFields.put("start", new FieldDescriptor("int", null));
         shiftFields.put("end", new FieldDescriptor("int", null));
-        shiftFields.put("employee", new FieldDescriptor("Employee", new DomainAccessor("getEmployee", "setEmployee"), List.of(new DomainPlanningVariable(false))));
+        shiftFields.put("employee", new FieldDescriptor("Employee", new DomainAccessor("getEmployee", "setEmployee"), List.of(new DomainPlanningVariable(false, null))));
         var shift = new DomainObject(shiftFields, null, null);
         shift.setName("Shift");
 
@@ -107,7 +107,7 @@ public class PlanningProblemDeserializationTest {
                                    "employee": {
                                        "type": "Employee",
                                        "accessor": {"getter": "getEmployee", "setter": "setEmployee"},
-                                       "annotations": [{"annotation": "PlanningVariable", "allowsUnassigned": true}]
+                                       "annotations": [{"annotation": "PlanningVariable"}]
                                    }
                                }
                            },

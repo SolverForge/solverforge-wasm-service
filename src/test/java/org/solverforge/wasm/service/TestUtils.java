@@ -41,7 +41,7 @@ public class TestUtils {
         var shiftFields = new LinkedHashMap<String, FieldDescriptor>();
         shiftFields.put("employee", new FieldDescriptor("Employee",
                 new DomainAccessor("getEmployee", "setEmployee"),
-                List.of(new DomainPlanningVariable(false))));
+                List.of(new DomainPlanningVariable(false, null))));
 
         var scheduleFields = new LinkedHashMap<String, FieldDescriptor>();
         scheduleFields.put("employees", new FieldDescriptor("Employee[]",
