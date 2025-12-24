@@ -379,7 +379,10 @@ public class DomainObjectClassGenerator {
                         var targetMethodName = cascading.getTargetMethodName();
                         var updateFunctionName = domainObject.getName() + "_" + targetMethodName;
                         var fieldType = field.getValue().getType();
-                        var isDateTime = "LocalDateTime".equals(fieldType);
+                        var isDateTime = fieldType != null &&
+                            (fieldType.equals("LocalDateTime") ||
+                             fieldType.equalsIgnoreCase("datetime") ||
+                             fieldType.contains("DateTime"));
                         classBuilder.withMethodBody(targetMethodName,
                                 MethodTypeDesc.of(voidDesc), ClassFile.ACC_PUBLIC, codeBuilder -> {
                                     // Call WASM update function: result = updateFunction(this.memoryPointer)
