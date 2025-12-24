@@ -373,6 +373,7 @@ public class DomainObjectClassGenerator {
                             });
 
                 // Generate update method for CascadingUpdateShadowVariable
+                // The method calls a WASM function to compute the new value and sets the field.
                 for (var annotation : annotations) {
                     if (annotation instanceof DomainCascadingUpdateShadowVariable cascading) {
                         var targetMethodName = cascading.getTargetMethodName();
@@ -400,13 +401,12 @@ public class DomainObjectClassGenerator {
                                     // Call the function
                                     codeBuilder.invokeinterface(getDescriptor(ExportFunction.class), "apply", MethodTypeDesc.of(longDesc.arrayType(), longDesc.arrayType()));
 
-                                    // Get result (epoch seconds for datetime, or 0 for null)
+                                    // Get result (epoch seconds for datetime, or value for other types)
                                     codeBuilder.loadConstant(0);
                                     codeBuilder.laload();
 
                                     // Check if result is 0 (null marker) or actual value
-                                    // Stack: [long epochSeconds]
-                                    codeBuilder.dup2();  // Duplicate long for comparison
+                                    codeBuilder.dup2();
                                     codeBuilder.lconst_0();
                                     codeBuilder.lcmp();
                                     var notNullLabel = codeBuilder.newLabel();
@@ -414,37 +414,30 @@ public class DomainObjectClassGenerator {
                                     codeBuilder.ifne(notNullLabel);
 
                                     // Result is 0, set field to null
-                                    codeBuilder.pop2();  // Pop the long
+                                    codeBuilder.pop2();
                                     codeBuilder.aload(0);
                                     codeBuilder.aconst_null();
                                     codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
                                     codeBuilder.goto_(endLabel);
 
-                                    // Result is non-zero epoch seconds, convert to LocalDateTime if needed
+                                    // Result is non-zero, convert and store
                                     codeBuilder.labelBinding(notNullLabel);
-                                    // Stack: [long epochSeconds]
                                     if (isDateTime) {
                                         // Convert epoch seconds to LocalDateTime
-                                        // LocalDateTime.ofEpochSecond(epochSeconds, 0, ZoneOffset.UTC)
                                         var localDateTimeDesc = ClassDesc.of("java.time.LocalDateTime");
                                         var zoneOffsetDesc = ClassDesc.of("java.time.ZoneOffset");
-                                        codeBuilder.lconst_0();  // nanoOfSecond = 0
+                                        codeBuilder.lconst_0();
                                         codeBuilder.l2i();
                                         codeBuilder.getstatic(zoneOffsetDesc, "UTC", zoneOffsetDesc);
                                         codeBuilder.invokestatic(localDateTimeDesc, "ofEpochSecond",
                                                 MethodTypeDesc.of(localDateTimeDesc, longDesc, intDesc, zoneOffsetDesc));
-                                        // Stack: [LocalDateTime]
                                         codeBuilder.aload(0);
                                         codeBuilder.swap();
                                         codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
                                     } else {
-                                        // Non-datetime type: convert long to appropriate type
-                                        // Stack: [long]
-                                        codeBuilder.l2i();  // Convert long to int
-                                        // Stack: [int]
-                                        codeBuilder.aload(0);  // Load 'this'
-                                        // Stack: [int, this]
-                                        codeBuilder.swap();  // Swap to get [this, int]
+                                        codeBuilder.l2i();
+                                        codeBuilder.aload(0);
+                                        codeBuilder.swap();
                                         if (!wrapperTypeDesc.equals(typeDesc)) {
                                             codeBuilder.invokestatic(wrapperTypeDesc, "valueOf", MethodTypeDesc.of(wrapperTypeDesc, typeDesc));
                                         }
