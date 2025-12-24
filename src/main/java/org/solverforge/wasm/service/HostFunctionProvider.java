@@ -81,7 +81,14 @@ public class HostFunctionProvider {
                 createListContainsString(),
                 createPrecomputed0(),
                 createPrecomputed1(),
-                createPrecomputed2()
+                createPrecomputed2(),
+                // Trigonometric functions
+                createSin(),
+                createCos(),
+                createAsin(),
+                createAcos(),
+                createAtan(),
+                createAtan2()
         );
     }
 
@@ -953,6 +960,72 @@ public class HostFunctionProvider {
         return new HostFunction("host", "hround",
                 FunctionType.of(List.of(ValType.F32), List.of(ValType.I32)),
                 (instance, args) -> new long[] { (long) (Float.intBitsToFloat((int) args[0]) * 10) });
+    }
+
+    // ========== Trigonometric Functions ==========
+
+    /**
+     * hsin(value: f64) -> f64
+     * Returns the sine of an angle in radians.
+     */
+    private HostFunction createSin() {
+        return new HostFunction("host", "hsin",
+                FunctionType.of(List.of(ValType.F64), List.of(ValType.F64)),
+                (instance, args) -> new long[] { Double.doubleToLongBits(Math.sin(Double.longBitsToDouble(args[0]))) });
+    }
+
+    /**
+     * hcos(value: f64) -> f64
+     * Returns the cosine of an angle in radians.
+     */
+    private HostFunction createCos() {
+        return new HostFunction("host", "hcos",
+                FunctionType.of(List.of(ValType.F64), List.of(ValType.F64)),
+                (instance, args) -> new long[] { Double.doubleToLongBits(Math.cos(Double.longBitsToDouble(args[0]))) });
+    }
+
+    /**
+     * hasin(value: f64) -> f64
+     * Returns the arc sine of a value, in radians.
+     */
+    private HostFunction createAsin() {
+        return new HostFunction("host", "hasin",
+                FunctionType.of(List.of(ValType.F64), List.of(ValType.F64)),
+                (instance, args) -> new long[] { Double.doubleToLongBits(Math.asin(Double.longBitsToDouble(args[0]))) });
+    }
+
+    /**
+     * hacos(value: f64) -> f64
+     * Returns the arc cosine of a value, in radians.
+     */
+    private HostFunction createAcos() {
+        return new HostFunction("host", "hacos",
+                FunctionType.of(List.of(ValType.F64), List.of(ValType.F64)),
+                (instance, args) -> new long[] { Double.doubleToLongBits(Math.acos(Double.longBitsToDouble(args[0]))) });
+    }
+
+    /**
+     * hatan(value: f64) -> f64
+     * Returns the arc tangent of a value, in radians.
+     */
+    private HostFunction createAtan() {
+        return new HostFunction("host", "hatan",
+                FunctionType.of(List.of(ValType.F64), List.of(ValType.F64)),
+                (instance, args) -> new long[] { Double.doubleToLongBits(Math.atan(Double.longBitsToDouble(args[0]))) });
+    }
+
+    /**
+     * hatan2(y: f64, x: f64) -> f64
+     * Returns the angle theta from the conversion of rectangular coordinates (x, y) to polar coordinates (r, theta).
+     */
+    private HostFunction createAtan2() {
+        return new HostFunction("host", "hatan2",
+                FunctionType.of(List.of(ValType.F64, ValType.F64), List.of(ValType.F64)),
+                (instance, args) -> new long[] {
+                    Double.doubleToLongBits(Math.atan2(
+                        Double.longBitsToDouble(args[0]),
+                        Double.longBitsToDouble(args[1])))
+                });
     }
 
     /**
