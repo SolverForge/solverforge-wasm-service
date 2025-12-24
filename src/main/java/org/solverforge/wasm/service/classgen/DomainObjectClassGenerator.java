@@ -377,6 +377,8 @@ public class DomainObjectClassGenerator {
                     if (annotation instanceof DomainCascadingUpdateShadowVariable cascading) {
                         var targetMethodName = cascading.getTargetMethodName();
                         var updateFunctionName = domainObject.getName() + "_" + targetMethodName;
+                        var fieldType = field.getValue().getType();
+                        var isDateTime = "LocalDateTime".equals(fieldType);
                         classBuilder.withMethodBody(targetMethodName,
                                 MethodTypeDesc.of(voidDesc), ClassFile.ACC_PUBLIC, codeBuilder -> {
                                     // Call WASM update function: result = updateFunction(this.memoryPointer)
@@ -403,28 +405,48 @@ public class DomainObjectClassGenerator {
                                     codeBuilder.laload();
 
                                     // Check if result is 0 (null marker) or actual value
-                                    // For now, store the result directly - the field type handling will interpret it
-                                    codeBuilder.l2i();  // Convert to int for storage
-                                    codeBuilder.dup();
+                                    // Stack: [long epochSeconds]
+                                    codeBuilder.dup2();  // Duplicate long for comparison
+                                    codeBuilder.lconst_0();
+                                    codeBuilder.lcmp();
                                     var notNullLabel = codeBuilder.newLabel();
                                     var endLabel = codeBuilder.newLabel();
                                     codeBuilder.ifne(notNullLabel);
 
                                     // Result is 0, set field to null
-                                    codeBuilder.pop();
+                                    codeBuilder.pop2();  // Pop the long
                                     codeBuilder.aload(0);
                                     codeBuilder.aconst_null();
                                     codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
                                     codeBuilder.goto_(endLabel);
 
-                                    // Result is non-zero, store it
+                                    // Result is non-zero epoch seconds, convert to LocalDateTime if needed
                                     codeBuilder.labelBinding(notNullLabel);
-                                    codeBuilder.aload(0);
-                                    codeBuilder.swap();
-                                    if (!wrapperTypeDesc.equals(typeDesc)) {
-                                        codeBuilder.invokestatic(wrapperTypeDesc, "valueOf", MethodTypeDesc.of(wrapperTypeDesc, typeDesc));
+                                    // Stack: [long epochSeconds]
+                                    if (isDateTime) {
+                                        // Convert epoch seconds to LocalDateTime
+                                        // LocalDateTime.ofEpochSecond(epochSeconds, 0, ZoneOffset.UTC)
+                                        var localDateTimeDesc = ClassDesc.of("java.time.LocalDateTime");
+                                        var zoneOffsetDesc = ClassDesc.of("java.time.ZoneOffset");
+                                        codeBuilder.lconst_0();  // nanoOfSecond = 0
+                                        codeBuilder.l2i();
+                                        codeBuilder.getstatic(zoneOffsetDesc, "UTC", zoneOffsetDesc);
+                                        codeBuilder.invokestatic(localDateTimeDesc, "ofEpochSecond",
+                                                MethodTypeDesc.of(localDateTimeDesc, longDesc, intDesc, zoneOffsetDesc));
+                                        // Stack: [LocalDateTime]
+                                        codeBuilder.aload(0);
+                                        codeBuilder.swap();
+                                        codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
+                                    } else {
+                                        // Non-datetime type: convert long to appropriate type
+                                        codeBuilder.aload(0);
+                                        codeBuilder.swap2();  // Get 'this' below the long
+                                        codeBuilder.l2i();  // Convert to int if needed
+                                        if (!wrapperTypeDesc.equals(typeDesc)) {
+                                            codeBuilder.invokestatic(wrapperTypeDesc, "valueOf", MethodTypeDesc.of(wrapperTypeDesc, typeDesc));
+                                        }
+                                        codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
                                     }
-                                    codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
 
                                     codeBuilder.labelBinding(endLabel);
                                     codeBuilder.return_();
