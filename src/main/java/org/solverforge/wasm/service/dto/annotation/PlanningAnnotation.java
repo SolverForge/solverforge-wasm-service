@@ -12,8 +12,9 @@ import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
 @JsonTypeInfo(use=JsonTypeInfo.Id.CUSTOM, property="annotation", visible=true)
 @JsonTypeIdResolver(AnnotationTypeIdResolver.class)
 public sealed interface PlanningAnnotation
-        permits DomainInverseRelationShadowVariable, DomainPlanningEntityCollectionProperty, DomainPlanningEntityProperty,
-        DomainPlanningId, DomainPlanningListVariable, DomainPlanningPin, DomainPlanningScore, DomainPlanningVariable,
+        permits DomainCascadingUpdateShadowVariable, DomainInverseRelationShadowVariable, DomainNextElementShadowVariable,
+        DomainPlanningEntityCollectionProperty, DomainPlanningEntityProperty, DomainPlanningId, DomainPlanningListVariable,
+        DomainPlanningPin, DomainPlanningScore, DomainPlanningVariable, DomainPreviousElementShadowVariable,
         DomainProblemFactCollectionProperty, DomainProblemFactProperty, DomainValueRangeProvider {
     @JsonIgnore
     Class<? extends Annotation> annotationClass();
