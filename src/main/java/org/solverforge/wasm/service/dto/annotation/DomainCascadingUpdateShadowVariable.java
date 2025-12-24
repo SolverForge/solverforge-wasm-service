@@ -41,4 +41,8 @@ public final class DomainCascadingUpdateShadowVariable implements PlanningAnnota
     public boolean isShadowVariable() {
         return true;
     }
+
+    public String getTargetMethodName() {
+        return targetMethodName;
+    }
 }

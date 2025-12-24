@@ -36,6 +36,7 @@ import org.solverforge.wasm.service.SolverResource;
 import org.solverforge.wasm.service.dto.DomainObject;
 import org.solverforge.wasm.service.dto.FieldDescriptor;
 import org.solverforge.wasm.service.dto.PlanningProblem;
+import org.solverforge.wasm.service.dto.annotation.DomainCascadingUpdateShadowVariable;
 import org.solverforge.wasm.service.dto.annotation.DomainPlanningScore;
 import org.solverforge.wasm.service.dto.annotation.DomainPlanningVariable;
 
@@ -370,6 +371,66 @@ public class DomainObjectClassGenerator {
                                     }
                                 }
                             });
+
+                // Generate update method for CascadingUpdateShadowVariable
+                for (var annotation : annotations) {
+                    if (annotation instanceof DomainCascadingUpdateShadowVariable cascading) {
+                        var targetMethodName = cascading.getTargetMethodName();
+                        var updateFunctionName = domainObject.getName() + "_" + targetMethodName;
+                        classBuilder.withMethodBody(targetMethodName,
+                                MethodTypeDesc.of(voidDesc), ClassFile.ACC_PUBLIC, codeBuilder -> {
+                                    // Call WASM update function: result = updateFunction(this.memoryPointer)
+                                    codeBuilder.aload(0);
+                                    codeBuilder.getfield(wasmObjectDesc, "wasmInstance", instanceDesc);
+                                    codeBuilder.loadConstant(updateFunctionName);
+                                    codeBuilder.invokevirtual(instanceDesc, "export", MethodTypeDesc.of(getDescriptor(ExportFunction.class), stringDesc));
+
+                                    // Prepare args array: new long[] { memoryPointer }
+                                    codeBuilder.loadConstant(1);
+                                    codeBuilder.newarray(TypeKind.LONG);
+                                    codeBuilder.dup();
+                                    codeBuilder.loadConstant(0);
+                                    codeBuilder.aload(0);
+                                    codeBuilder.getfield(wasmObjectDesc, "memoryPointer", intDesc);
+                                    codeBuilder.i2l();
+                                    codeBuilder.lastore();
+
+                                    // Call the function
+                                    codeBuilder.invokeinterface(getDescriptor(ExportFunction.class), "apply", MethodTypeDesc.of(longDesc.arrayType(), longDesc.arrayType()));
+
+                                    // Get result (epoch seconds for datetime, or 0 for null)
+                                    codeBuilder.loadConstant(0);
+                                    codeBuilder.laload();
+
+                                    // Check if result is 0 (null marker) or actual value
+                                    // For now, store the result directly - the field type handling will interpret it
+                                    codeBuilder.l2i();  // Convert to int for storage
+                                    codeBuilder.dup();
+                                    var notNullLabel = codeBuilder.newLabel();
+                                    var endLabel = codeBuilder.newLabel();
+                                    codeBuilder.ifne(notNullLabel);
+
+                                    // Result is 0, set field to null
+                                    codeBuilder.pop();
+                                    codeBuilder.aload(0);
+                                    codeBuilder.aconst_null();
+                                    codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
+                                    codeBuilder.goto_(endLabel);
+
+                                    // Result is non-zero, store it
+                                    codeBuilder.labelBinding(notNullLabel);
+                                    codeBuilder.aload(0);
+                                    codeBuilder.swap();
+                                    if (!wrapperTypeDesc.equals(typeDesc)) {
+                                        codeBuilder.invokestatic(wrapperTypeDesc, "valueOf", MethodTypeDesc.of(wrapperTypeDesc, typeDesc));
+                                    }
+                                    codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
+
+                                    codeBuilder.labelBinding(endLabel);
+                                    codeBuilder.return_();
+                                });
+                    }
+                }
             }
             if (isPlanningEntity && isPlanningSolution) {
                 throw new IllegalArgumentException("Class %s is both a planning entity and planning solution."
