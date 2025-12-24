@@ -439,9 +439,12 @@ public class DomainObjectClassGenerator {
                                         codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
                                     } else {
                                         // Non-datetime type: convert long to appropriate type
-                                        codeBuilder.aload(0);
-                                        codeBuilder.swap2();  // Get 'this' below the long
-                                        codeBuilder.l2i();  // Convert to int if needed
+                                        // Stack: [long]
+                                        codeBuilder.l2i();  // Convert long to int
+                                        // Stack: [int]
+                                        codeBuilder.aload(0);  // Load 'this'
+                                        // Stack: [int, this]
+                                        codeBuilder.swap();  // Swap to get [this, int]
                                         if (!wrapperTypeDesc.equals(typeDesc)) {
                                             codeBuilder.invokestatic(wrapperTypeDesc, "valueOf", MethodTypeDesc.of(wrapperTypeDesc, typeDesc));
                                         }
