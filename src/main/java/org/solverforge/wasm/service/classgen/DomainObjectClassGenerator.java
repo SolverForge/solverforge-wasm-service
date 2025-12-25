@@ -74,16 +74,17 @@ public class DomainObjectClassGenerator {
         if (wasmType.endsWith("[]")) {
             return getDescriptor(WasmList.class);
         }
-        return switch (wasmType) {
+        return switch (wasmType.toLowerCase()) {
             case "int" -> intDesc;
             case "long" -> longDesc;
             case "float" -> floatDesc;
             case "double" -> doubleDesc;
-            case "String" -> stringDesc;
-            case "SimpleScore" -> getDescriptor(SimpleScore.class);
-            case "HardSoftScore" -> getDescriptor(HardSoftScore.class);
-            case "HardMediumSoftScore" -> getDescriptor(HardMediumSoftScore.class);
-            case "BendableScore" -> getDescriptor(BendableScore.class);
+            case "string" -> stringDesc;
+            case "datetime", "localdatetime" -> ClassDesc.of("java.time.LocalDateTime");
+            case "simplescore" -> getDescriptor(SimpleScore.class);
+            case "hardsoftscore" -> getDescriptor(HardSoftScore.class);
+            case "hardmediumsoftscore" -> getDescriptor(HardMediumSoftScore.class);
+            case "bendablescore" -> getDescriptor(BendableScore.class);
             default -> ClassDesc.ofInternalName(wasmType);
         };
     }
@@ -92,7 +93,7 @@ public class DomainObjectClassGenerator {
         if (wasmType.endsWith("[]")) {
             return getDescriptor(WasmList.class);
         }
-        return switch (wasmType) {
+        return switch (wasmType.toLowerCase()) {
             case "int" -> getDescriptor(Integer.class);
             case "long" -> getDescriptor(Long.class);
             case "float" -> getDescriptor(Float.class);
