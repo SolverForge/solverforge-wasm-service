@@ -292,10 +292,11 @@ public class DomainObjectClassGenerator {
                                 )));
                             }
                             methodBuilder.withCode(codeBuilder -> {
-                                if (finalIsPlanningScore) {
+                                if (finalIsPlanningScore || finalIsShadowVariable) {
+                                    // Score and shadow variables are managed by the solver/update methods - read field directly
                                     codeBuilder.aload(0);
-                                    codeBuilder.getfield(ClassDesc.of(domainObject.getName()), field.getKey(), typeDesc);
-                                    codeBuilder.return_(getTypeKind(field.getValue().getType()));
+                                    codeBuilder.getfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
+                                    codeBuilder.return_(TypeKind.REFERENCE);
                                 } else {
                                     if (field.getValue().getAccessor() != null) {
                                         codeBuilder.aload(0);
