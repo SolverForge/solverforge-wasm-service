@@ -1,7 +1,9 @@
 package org.solverforge.wasm.service.classgen;
 
 import java.util.Comparator;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.IntFunction;
@@ -10,9 +12,21 @@ import java.util.function.ToIntFunction;
 import org.solverforge.wasm.service.FunctionCache;
 import org.solverforge.wasm.service.SolverResource;
 
+import org.apache.commons.collections4.map.ConcurrentReferenceHashMap;
+
 import com.dylibso.chicory.runtime.Instance;
 
 public class WasmObject implements Comparable<WasmObject> {
+    /**
+     * Global cache of entity objects by (Instance, memoryPointer).
+     * This ensures the same Java object is returned for the same WASM memory location,
+     * which is critical for Timefold's shadow variable tracking (uses object identity).
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static final ConcurrentReferenceHashMap<Instance, Map<Integer, WasmObject>> entityCache =
+            (ConcurrentReferenceHashMap) new ConcurrentReferenceHashMap.Builder<>()
+                    .weakKeys().strongValues().get();
+
     public final Instance wasmInstance;
     public final int memoryPointer;
     private final Comparator<Integer> comparator;
@@ -141,15 +155,32 @@ public class WasmObject implements Comparable<WasmObject> {
                 hasher, null);
     }
 
+    /**
+     * Gets a cached entity for the given memory pointer, or caches and returns the default.
+     * This ensures the same Java object is returned for the same WASM memory location.
+     */
     public static WasmObject ofExistingOrDefault(Instance wasmInstance,
             int memoryPointer, WasmObject defaultValue) {
-        return defaultValue;
+        if (memoryPointer == 0) {
+            return null;
+        }
+        var instanceCache = entityCache.computeIfAbsent(wasmInstance, _ -> new ConcurrentHashMap<>());
+        return instanceCache.computeIfAbsent(memoryPointer, _ -> defaultValue);
     }
 
+    /**
+     * Gets or creates a cached entity for the given memory pointer.
+     * This ensures the same Java object is returned for the same WASM memory location,
+     * which is critical for Timefold's shadow variable tracking (uses object identity).
+     */
     @SuppressWarnings("unchecked")
     public static <Item_ extends WasmObject> Item_ ofExistingOrCreate(Instance wasmInstance,
             int memoryPointer, IntFunction<Item_> factory) {
-        return factory.apply(memoryPointer);
+        if (memoryPointer == 0) {
+            return null;
+        }
+        var instanceCache = entityCache.computeIfAbsent(wasmInstance, _ -> new ConcurrentHashMap<>());
+        return (Item_) instanceCache.computeIfAbsent(memoryPointer, factory::apply);
     }
 
     @Override

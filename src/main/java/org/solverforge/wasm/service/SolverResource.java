@@ -360,6 +360,8 @@ public class SolverResource {
                 ALLOCATOR.set(allocator);
                 try {
                     solver.solve(solverInput);
+                } catch (Exception e) {
+                    LOG.error("Solve failed", e);
                 } finally {
                     solving.set(false);
                     GENERATED_CLASS_LOADER.remove();

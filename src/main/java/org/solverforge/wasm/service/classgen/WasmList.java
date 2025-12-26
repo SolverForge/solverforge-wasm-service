@@ -36,13 +36,15 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
         var wasmInstance = listAccessor.getWasmInstance();
         try {
             var itemClassConstructor = itemClass.getConstructor(Instance.class, int.class);
-            itemFromPointer = pointer -> {
+            // Use WasmObject.ofExistingOrCreate to ensure the same Java object is returned
+            // for the same WASM memory pointer (critical for Timefold shadow variable tracking)
+            itemFromPointer = pointer -> WasmObject.ofExistingOrCreate(wasmInstance, pointer, p -> {
                 try {
-                    return itemClassConstructor.newInstance(wasmInstance, pointer);
+                    return itemClassConstructor.newInstance(wasmInstance, p);
                 } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
                     throw new RuntimeException(e);
                 }
-            };
+            });
         } catch (NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
