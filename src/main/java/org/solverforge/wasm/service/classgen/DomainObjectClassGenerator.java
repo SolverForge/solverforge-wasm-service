@@ -323,21 +323,23 @@ public class DomainObjectClassGenerator {
                                                 annotation.getAnnotationElements()));
                             }
                             methodBuilder.with(RuntimeVisibleAnnotationsAttribute.of(annotationsList));
+                            // For list fields, determine the element type
+                            ClassDesc listElementType = null;
                             if (field.getValue().getType().endsWith("[]")) {
                                 // For planning list variables, use the element type from the value range provider
-                                ClassDesc innerType;
                                 if (finalPlanningListVariable != null && finalPlanningListVariable.getValueRangeProviderRefs().length > 0) {
                                     String elementClassName = lookupValueRangeProviderElementType(
                                             planningProblem, finalPlanningListVariable.getValueRangeProviderRefs()[0]);
-                                    innerType = ClassDesc.ofInternalName(elementClassName);
+                                    listElementType = ClassDesc.ofInternalName(elementClassName);
                                 } else {
-                                    innerType = getWasmTypeDesc(field.getValue().getType().substring(0, field.getValue().getType().length() - 2));
+                                    listElementType = getWasmTypeDesc(field.getValue().getType().substring(0, field.getValue().getType().length() - 2));
                                 }
                                 methodBuilder.with(SignatureAttribute.of(MethodSignature.of(
                                         Signature.ClassTypeSig.of(getDescriptor(WasmList.class), Signature.TypeArg.of(
-                                                Signature.ClassTypeSig.of(innerType)))
+                                                Signature.ClassTypeSig.of(listElementType)))
                                 )));
                             }
+                            var finalListElementType = listElementType;
                             methodBuilder.withCode(codeBuilder -> {
                                 if (finalIsPlanningScore || finalIsShadowVariable) {
                                     // Score and shadow variables are managed by the solver/update methods - read field directly
@@ -354,7 +356,12 @@ public class DomainObjectClassGenerator {
                                         codeBuilder.block(block -> {
                                             codeBuilder.if_acmpne(block.endLabel());
                                             codeBuilder.pop();
-                                            readWasmFieldUsingAccessor(field.getValue(), codeBuilder);
+                                            // For planning list variables, use the correct element type from VRP
+                                            if (finalListElementType != null) {
+                                                readWasmListFieldUsingAccessor(field.getValue(), codeBuilder, finalListElementType);
+                                            } else {
+                                                readWasmFieldUsingAccessor(field.getValue(), codeBuilder);
+                                            }
                                             codeBuilder.dup();
                                             codeBuilder.aload(0);
                                             codeBuilder.swap();
@@ -647,6 +654,47 @@ public class DomainObjectClassGenerator {
                 }
             }
         }
+    }
+
+    /**
+     * Specialized version of readWasmFieldUsingAccessor for list fields that uses the correct element type.
+     * This is critical for planning list variables where the field type might be String[] but
+     * the actual element type (from the value range provider) is Visit.
+     */
+    private static void readWasmListFieldUsingAccessor(FieldDescriptor fieldDescriptor,
+            CodeBuilder codeBuilder, ClassDesc elementType) {
+        var getterFunctionName = fieldDescriptor.getAccessor().getterFunctionName();
+        codeBuilder.aload(0);
+        codeBuilder.getfield(wasmObjectDesc, "wasmInstance", instanceDesc);
+        codeBuilder.loadConstant(getterFunctionName);
+        codeBuilder.invokevirtual(instanceDesc, "export", MethodTypeDesc.of(getDescriptor(ExportFunction.class), stringDesc));
+        codeBuilder.loadConstant(1);
+        codeBuilder.newarray(TypeKind.LONG);
+        codeBuilder.dup();
+        codeBuilder.loadConstant(0);
+        codeBuilder.aload(0);
+        codeBuilder.getfield(wasmObjectDesc, "memoryPointer", intDesc);
+        codeBuilder.i2l();
+        codeBuilder.lastore();
+
+        codeBuilder.invokeinterface(getDescriptor(ExportFunction.class), "apply", MethodTypeDesc.of(longDesc.arrayType(), longDesc.arrayType()));
+        codeBuilder.loadConstant(0);
+        codeBuilder.laload();
+        codeBuilder.l2i();
+
+        // Check for null pointer
+        var notNullLabel = codeBuilder.newLabel();
+        codeBuilder.dup();
+        codeBuilder.loadConstant(0);
+        codeBuilder.if_icmpne(notNullLabel);
+        codeBuilder.pop();
+        codeBuilder.aconst_null();
+        codeBuilder.areturn();
+
+        codeBuilder.labelBinding(notNullLabel);
+        // Use the provided element type (e.g., Visit) instead of the field's declared element type (e.g., String)
+        codeBuilder.loadConstant(elementType);
+        codeBuilder.invokestatic(getDescriptor(WasmList.class), "ofExisting", MethodTypeDesc.of(getDescriptor(WasmList.class), intDesc, getDescriptor(Class.class)));
     }
 
     private void writeWasmFieldUsingAccessor(FieldDescriptor fieldDescriptor, CodeBuilder codeBuilder, Consumer<CodeBuilder> valueBuilder) {
