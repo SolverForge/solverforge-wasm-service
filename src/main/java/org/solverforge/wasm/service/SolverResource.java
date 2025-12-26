@@ -8,17 +8,24 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 
 import jakarta.inject.Inject;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 
+import ai.timefold.solver.core.api.score.Score;
 import ai.timefold.solver.core.api.score.analysis.ScoreAnalysis;
 import ai.timefold.solver.core.api.solver.SolutionManager;
 import ai.timefold.solver.core.api.solver.SolverFactory;
+import ai.timefold.solver.core.api.solver.SolverJob;
 import ai.timefold.solver.core.api.solver.SolverManager;
+import ai.timefold.solver.core.api.solver.SolverStatus;
 import ai.timefold.solver.core.config.solver.SolverConfig;
 import ai.timefold.solver.core.impl.util.MutableReference;
 import org.solverforge.wasm.service.classgen.Allocator;
@@ -50,6 +57,34 @@ public class SolverResource {
 
     // Cache parsed WASM modules by SHA-256 hash to avoid re-parsing
     private static final ConcurrentHashMap<String, WasmModule> MODULE_CACHE = new ConcurrentHashMap<>();
+
+    // Storage for active async solves
+    private static final ConcurrentHashMap<String, ActiveSolve> ACTIVE_SOLVES = new ConcurrentHashMap<>();
+
+    // Record for tracking an active solve
+    record ActiveSolve(
+        SolverManager<Object, String> solverManager,
+        String bestSolution,
+        Score<?> bestScore,
+        SolverStatus status
+    ) {
+        ActiveSolve withBest(String solution, Score<?> score) {
+            return new ActiveSolve(solverManager, solution, score, status);
+        }
+        ActiveSolve withStatus(SolverStatus status) {
+            return new ActiveSolve(solverManager, bestSolution, bestScore, status);
+        }
+    }
+
+    // DTO records for async API responses (field names must match Rust client's camelCase expectations)
+    public record AsyncSolveResponse(String solveId) {}
+    public record SolveStatusResponse(
+        String state,
+        long timeSpentMs,
+        Object bestScore,  // ScoreDto or null
+        String error
+    ) {}
+    public record BestSolutionResponse(String solution, Object score) {}
 
     public static ThreadLocal<Instance> INSTANCE = new ThreadLocal<>();
     public static ThreadLocal<ExportCache> EXPORT_CACHE = new ThreadLocal<>();
@@ -221,5 +256,179 @@ public class SolverResource {
             var solutionManager = SolutionManager.create(SolverManager.create(solverFactory));
             return solutionManager.analyze(solverInput);
         });
+    }
+
+    // ============================================================================
+    // Async Solving Endpoints
+    // ============================================================================
+
+    // Executor for background solves
+    private static final java.util.concurrent.ExecutorService SOLVE_EXECUTOR =
+        java.util.concurrent.Executors.newCachedThreadPool();
+
+    // Active async solve context (keeps WASM instance and class loader alive)
+    record AsyncSolveContext(
+        Instance wasmInstance,
+        DomainObjectClassLoader classLoader,
+        WasmListAccessor listAccessor,
+        ExportCache exportCache,
+        FunctionCache functionCache,
+        Allocator allocator,
+        ai.timefold.solver.core.api.solver.Solver<Object> solver,
+        MutableReference<String> bestSolution,
+        MutableReference<Score<?>> bestScore,
+        java.util.concurrent.atomic.AtomicBoolean solving
+    ) {}
+
+    private static final ConcurrentHashMap<String, AsyncSolveContext> ASYNC_CONTEXTS = new ConcurrentHashMap<>();
+
+    @POST
+    @Path("solve/async")
+    public AsyncSolveResponse solveAsync(PlanningProblem planningProblem) {
+        String solveId = UUID.randomUUID().toString();
+
+        // Set up the WASM context
+        var domainObjectClassGenerator = new DomainObjectClassGenerator();
+        var wasmInstance = createWasmInstance(planningProblem);
+        var classLoader = new DomainObjectClassLoader();
+        var listAccessor = new WasmListAccessor(wasmInstance, planningProblem.getListAccessor());
+        var exportCache = new ExportCache(wasmInstance);
+        var functionCache = new FunctionCache();
+        var allocator = new Allocator(wasmInstance, planningProblem.getAllocator(), planningProblem.getDeallocator(),
+                planningProblem.getSolutionDeallocator());
+
+        // Set ThreadLocals for class generation
+        GENERATED_CLASS_LOADER.set(classLoader);
+        INSTANCE.set(wasmInstance);
+        EXPORT_CACHE.set(exportCache);
+        FUNCTION_CACHE.set(functionCache);
+        LIST_ACCESSOR.set(listAccessor);
+        ALLOCATOR.set(allocator);
+
+        try {
+            domainObjectClassGenerator.prepareClassesForPlanningProblem(planningProblem);
+
+            var solutionClass = classLoader.getClassForDomainClassName(planningProblem.getSolutionClass());
+            var entityClassList = new ArrayList<Class<?>>(planningProblem.getEntityClassList().size());
+            for (var entityClass : planningProblem.getEntityClassList()) {
+                entityClassList.add(classLoader.getClassForDomainClassName(entityClass));
+            }
+
+            var solverConfig = new SolverConfig();
+            solverConfig.setSolutionClass(solutionClass);
+            solverConfig.setEntityClassList(entityClassList);
+            solverConfig.setEnvironmentMode(planningProblem.getEnvironmentMode());
+
+            var constraintProviderClass = new ConstraintProviderClassGenerator()
+                    .defineConstraintProviderClass(planningProblem);
+
+            generatedClassPath.ifPresent(s -> classLoader.dumpGeneratedClasses(Paths.get(s)));
+
+            solverConfig.withConstraintProviderClass(constraintProviderClass);
+            solverConfig.withTerminationConfig(planningProblem.terminationConfig());
+
+            var solverFactory = SolverFactory.create(solverConfig);
+            var solver = solverFactory.buildSolver();
+
+            // Convert the problem
+            var solverInput = convertPlanningProblem(wasmInstance, classLoader, planningProblem);
+
+            // Track best solution
+            var bestSolutionRef = new MutableReference<String>(planningProblem.getProblem());
+            var bestScoreRef = new MutableReference<Score<?>>(null);
+            var solving = new java.util.concurrent.atomic.AtomicBoolean(true);
+
+            solver.addEventListener(event -> {
+                bestSolutionRef.setValue(event.getNewBestSolution().toString());
+                bestScoreRef.setValue(event.getNewBestScore());
+            });
+
+            // Store context for later queries
+            var context = new AsyncSolveContext(
+                wasmInstance, classLoader, listAccessor, exportCache, functionCache,
+                allocator, solver, bestSolutionRef, bestScoreRef, solving
+            );
+            ASYNC_CONTEXTS.put(solveId, context);
+
+            // Run solve in background with proper ThreadLocal context
+            SOLVE_EXECUTOR.submit(() -> {
+                GENERATED_CLASS_LOADER.set(classLoader);
+                INSTANCE.set(wasmInstance);
+                EXPORT_CACHE.set(exportCache);
+                FUNCTION_CACHE.set(functionCache);
+                LIST_ACCESSOR.set(listAccessor);
+                ALLOCATOR.set(allocator);
+                try {
+                    solver.solve(solverInput);
+                } finally {
+                    solving.set(false);
+                    GENERATED_CLASS_LOADER.remove();
+                    LIST_ACCESSOR.remove();
+                    FUNCTION_CACHE.remove();
+                    EXPORT_CACHE.remove();
+                    INSTANCE.remove();
+                    ALLOCATOR.remove();
+                }
+            });
+
+            return new AsyncSolveResponse(solveId);
+        } finally {
+            // Clean up ThreadLocals from setup thread (context is preserved in ASYNC_CONTEXTS)
+            GENERATED_CLASS_LOADER.remove();
+            LIST_ACCESSOR.remove();
+            FUNCTION_CACHE.remove();
+            EXPORT_CACHE.remove();
+            INSTANCE.remove();
+            ALLOCATOR.remove();
+        }
+    }
+
+    @GET
+    @Path("solve/{id}/status")
+    public SolveStatusResponse getSolveStatus(@PathParam("id") String solveId) {
+        var context = ASYNC_CONTEXTS.get(solveId);
+        if (context == null) {
+            throw new jakarta.ws.rs.NotFoundException("Solve not found: " + solveId);
+        }
+
+        String state = context.solving().get() ? "RUNNING" : "TERMINATED";
+        Score<?> bestScore = context.bestScore().getValue();
+
+        return new SolveStatusResponse(state, 0L, bestScore, null);
+    }
+
+    @GET
+    @Path("solve/{id}/best")
+    public BestSolutionResponse getBestSolution(@PathParam("id") String solveId) {
+        var context = ASYNC_CONTEXTS.get(solveId);
+        if (context == null) {
+            throw new jakarta.ws.rs.NotFoundException("Solve not found: " + solveId);
+        }
+
+        String solution = context.bestSolution().getValue();
+        Score<?> score = context.bestScore().getValue();
+
+        return new BestSolutionResponse(solution, score);
+    }
+
+    @POST
+    @Path("solve/{id}/stop")
+    public void stopSolve(@PathParam("id") String solveId) {
+        var context = ASYNC_CONTEXTS.get(solveId);
+        if (context == null) {
+            throw new jakarta.ws.rs.NotFoundException("Solve not found: " + solveId);
+        }
+
+        context.solver().terminateEarly();
+        // Note: context cleanup happens when solve thread exits
+    }
+
+    @DELETE
+    @Path("solve/{id}")
+    public void deleteSolve(@PathParam("id") String solveId) {
+        var context = ASYNC_CONTEXTS.remove(solveId);
+        if (context != null && context.solving().get()) {
+            context.solver().terminateEarly();
+        }
     }
 }
