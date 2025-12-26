@@ -330,8 +330,23 @@ public class HostFunctionProvider {
 
         for (int i = 0; i < arrayNode.size(); i++) {
             JsonNode elementJson = arrayNode.get(i);
-            int element = parseObject(instance, alloc, newList, append, elementType, elementDef,
-                    elementJson, entityMaps, listPointers);
+            int element;
+
+            // If the element is a string (ID reference) and we have an entity map for this type,
+            // look up the entity pointer instead of parsing it as an object.
+            // This handles planning list variables where the JSON stores IDs but Java needs entity references.
+            if (elementJson.isTextual() && entityMaps.containsKey(elementType)) {
+                String id = elementJson.asText();
+                Integer ptr = entityMaps.get(elementType).get(id);
+                if (ptr == null) {
+                    throw new IllegalStateException("Entity " + elementType + " with id '" + id + "' not found. " +
+                            "Available: " + entityMaps.get(elementType).keySet());
+                }
+                element = ptr;
+            } else {
+                element = parseObject(instance, alloc, newList, append, elementType, elementDef,
+                        elementJson, entityMaps, listPointers);
+            }
             append.apply(list, element);
         }
 
