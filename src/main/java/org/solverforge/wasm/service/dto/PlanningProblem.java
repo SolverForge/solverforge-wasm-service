@@ -66,12 +66,14 @@ public class PlanningProblem {
             @Nullable @JsonProperty("termination") PlanningTermination terminationConfig,
             @Nullable @JsonProperty("precomputed") Map<Integer, Map<String, Integer>> precomputed) {
         this.domainObjectMap = domainObjectMap;
-        this.constraintList = constraintList.entrySet()
-                .stream()
-                .map(entry -> {
-                    entry.getValue().name = entry.getKey();
-                    return entry.getValue();
-                }).toList();
+        this.constraintList = (constraintList != null)
+                ? constraintList.entrySet()
+                    .stream()
+                    .map(entry -> {
+                        entry.getValue().name = entry.getKey();
+                        return entry.getValue();
+                    }).toList()
+                : List.of();
         this.environmentMode = (environmentMode != null)? environmentMode : EnvironmentMode.PHASE_ASSERT;
         this.problem = problem;
         this.wasm = Base64.getDecoder().decode(wasm);

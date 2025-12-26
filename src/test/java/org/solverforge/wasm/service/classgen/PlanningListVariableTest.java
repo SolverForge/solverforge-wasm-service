@@ -16,6 +16,7 @@ import org.solverforge.wasm.service.dto.DomainAccessor;
 import org.solverforge.wasm.service.dto.DomainObject;
 import org.solverforge.wasm.service.dto.FieldDescriptor;
 import org.solverforge.wasm.service.dto.PlanningProblem;
+import org.solverforge.wasm.service.dto.annotation.DomainPlanningEntity;
 import org.solverforge.wasm.service.dto.annotation.DomainPlanningEntityCollectionProperty;
 import org.solverforge.wasm.service.dto.annotation.DomainPlanningId;
 import org.solverforge.wasm.service.dto.annotation.DomainPlanningListVariable;
@@ -30,6 +31,9 @@ import org.solverforge.wasm.service.dto.annotation.DomainValueRangeProvider;
  * the list generic type, not the storage type (e.g., String).
  */
 public class PlanningListVariableTest {
+
+    // Minimal valid WASM module (empty module) - base64 of "\0asm\1\0\0\0"
+    private static final String MINIMAL_WASM = "AGFzbQEAAAA=";
 
     private DomainObjectClassGenerator classGenerator;
     private DomainObjectClassLoader classLoader;
@@ -92,14 +96,14 @@ public class PlanningListVariableTest {
                 domainObjects,
                 null, // constraints
                 null, // environmentMode
-                null, // wasmModule
-                null, // allocatorFunctionName
-                null, // deallocatorFunctionName
-                null, // scoreHolderAccessor
+                MINIMAL_WASM,
+                "alloc",
+                "dealloc",
+                null, // solutionDeallocator
                 null, // listAccessor
-                null, // solutionJson
+                "{}", // problem JSON
                 null, // termination
-                null  // moveConfig
+                null  // precomputed
         );
 
         // Generate classes
@@ -136,12 +140,20 @@ public class PlanningListVariableTest {
                 new DomainAccessor("getVisits", "setVisits"),
                 List.of(new DomainPlanningListVariable(false, new String[]{"nonExistentProvider"}))));
 
+        var solutionFields = new LinkedHashMap<String, FieldDescriptor>();
+        solutionFields.put("vehicles", new FieldDescriptor("Vehicle[]",
+                new DomainAccessor("getVehicles", "setVehicles"),
+                List.of(new DomainPlanningEntityCollectionProperty())));
+        solutionFields.put("score", new FieldDescriptor("HardSoftScore",
+                List.of(new DomainPlanningScore())));
+
         var domainObjects = new LinkedHashMap<String, DomainObject>();
         domainObjects.put("Vehicle", new DomainObject(vehicleFields, null, null));
+        domainObjects.put("Solution", new DomainObject(solutionFields, null, null));
 
         var planningProblem = new PlanningProblem(
                 domainObjects,
-                null, null, null, null, null, null, null, null, null, null
+                null, null, MINIMAL_WASM, "alloc", "dealloc", null, null, "{}", null, null
         );
 
         assertThatThrownBy(() -> classGenerator.prepareClassesForPlanningProblem(planningProblem))
@@ -151,41 +163,48 @@ public class PlanningListVariableTest {
     }
 
     /**
-     * Tests that a regular list (not a planning list variable) uses the storage type.
+     * Tests that value range provider collections (not planning list variables) use the storage type.
      */
     @Test
-    void regularListUsesStorageType() throws Exception {
-        var entityFields = new LinkedHashMap<String, FieldDescriptor>();
-        entityFields.put("id", new FieldDescriptor("String",
+    void valueRangeProviderUsesStorageType() throws Exception {
+        // Test that a VRP collection uses its declared element type directly
+        var visitFields = new LinkedHashMap<String, FieldDescriptor>();
+        visitFields.put("id", new FieldDescriptor("String",
                 new DomainAccessor("getId", null),
                 List.of(new DomainPlanningId())));
-        // Regular list, not a planning list variable - but with an annotation so the field is processed
-        entityFields.put("tags", new FieldDescriptor("String[]",
-                new DomainAccessor("getTags", "setTags"),
-                List.of(new DomainPlanningId()))); // Using any annotation to ensure field is processed
+
+        var solutionFields = new LinkedHashMap<String, FieldDescriptor>();
+        // This VRP is not referenced by any list variable, so should use Visit directly
+        solutionFields.put("visits", new FieldDescriptor("Visit[]",
+                new DomainAccessor("getVisits", "setVisits"),
+                List.of(new DomainPlanningEntityCollectionProperty(),
+                        new DomainValueRangeProvider("visits"))));
+        solutionFields.put("score", new FieldDescriptor("HardSoftScore",
+                List.of(new DomainPlanningScore())));
 
         var domainObjects = new LinkedHashMap<String, DomainObject>();
-        domainObjects.put("Entity", new DomainObject(entityFields, null, null));
+        domainObjects.put("Visit", new DomainObject(visitFields, null, List.of(new DomainPlanningEntity())));
+        domainObjects.put("Solution", new DomainObject(solutionFields, null, null));
 
         var planningProblem = new PlanningProblem(
                 domainObjects,
-                null, null, null, null, null, null, null, null, null, null
+                null, null, MINIMAL_WASM, "alloc", "dealloc", null, null, "{}", null, null
         );
 
         classGenerator.prepareClassesForPlanningProblem(planningProblem);
 
-        Class<?> entityClass = classLoader.getClassForDomainClassName("Entity");
-        Method getTags = entityClass.getMethod("getTags");
+        Class<?> solutionClass = classLoader.getClassForDomainClassName("Solution");
+        Method getVisits = solutionClass.getMethod("getVisits");
 
-        // Verify the generic return type is WasmList<String>
-        assertThat(getTags.getGenericReturnType()).isInstanceOf(ParameterizedType.class);
-        ParameterizedType returnType = (ParameterizedType) getTags.getGenericReturnType();
+        // Verify the generic return type is WasmList<Visit>
+        assertThat(getVisits.getGenericReturnType()).isInstanceOf(ParameterizedType.class);
+        ParameterizedType returnType = (ParameterizedType) getVisits.getGenericReturnType();
 
         assertThat(returnType.getRawType()).isEqualTo(WasmList.class);
         assertThat(returnType.getActualTypeArguments()).hasSize(1);
 
-        // The element type should be String (storage type)
+        // The element type should be Visit (the declared storage type)
         Class<?> elementType = (Class<?>) returnType.getActualTypeArguments()[0];
-        assertThat(elementType).isEqualTo(String.class);
+        assertThat(elementType.getSimpleName()).isEqualTo("Visit");
     }
 }
