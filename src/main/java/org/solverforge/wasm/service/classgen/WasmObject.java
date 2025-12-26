@@ -140,21 +140,20 @@ public class WasmObject implements Comparable<WasmObject> {
 
     public static WasmObject ofExisting(Instance wasmInstance,
             int memoryPointer) {
-        return ofExistingOrDefault(wasmInstance, memoryPointer,
-                new WasmObject(wasmInstance, memoryPointer));
+        // Don't cache - these are untyped wrappers (e.g., for lists).
+        // Entity caching happens through ofExistingOrCreate which has the typed factory.
+        return new WasmObject(wasmInstance, memoryPointer);
     }
 
     public static WasmObject ofExisting(Instance wasmInstance,
             int memoryPointer, Comparator<Integer> comparator) {
-        return ofExistingOrDefault(wasmInstance, memoryPointer,
-                new WasmObject(wasmInstance, memoryPointer, comparator));
+        return new WasmObject(wasmInstance, memoryPointer, comparator);
     }
 
     public static WasmObject ofExisting(Instance wasmInstance,
             int memoryPointer, BiPredicate<Integer, Integer> equalRelation,
             ToIntFunction<Integer> hasher) {
-        return ofExistingOrDefault(wasmInstance, memoryPointer,
-                new WasmObject(wasmInstance, memoryPointer, equalRelation, hasher, null));
+        return new WasmObject(wasmInstance, memoryPointer, equalRelation, hasher, null);
     }
 
     /**
@@ -167,7 +166,13 @@ public class WasmObject implements Comparable<WasmObject> {
             return null;
         }
         var instanceCache = entityCache.computeIfAbsent(wasmInstance, _ -> new ConcurrentHashMap<>());
-        return instanceCache.computeIfAbsent(memoryPointer, _ -> defaultValue);
+        // Use get + putIfAbsent instead of computeIfAbsent to avoid potential issues
+        var existing = instanceCache.get(memoryPointer);
+        if (existing != null) {
+            return existing;
+        }
+        var prev = instanceCache.putIfAbsent(memoryPointer, defaultValue);
+        return prev != null ? prev : defaultValue;
     }
 
     /**
