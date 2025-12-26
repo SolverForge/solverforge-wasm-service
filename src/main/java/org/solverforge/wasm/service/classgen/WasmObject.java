@@ -140,19 +140,21 @@ public class WasmObject implements Comparable<WasmObject> {
 
     public static WasmObject ofExisting(Instance wasmInstance,
             int memoryPointer) {
-        return new WasmObject(wasmInstance, memoryPointer);
+        return ofExistingOrDefault(wasmInstance, memoryPointer,
+                new WasmObject(wasmInstance, memoryPointer));
     }
 
     public static WasmObject ofExisting(Instance wasmInstance,
             int memoryPointer, Comparator<Integer> comparator) {
-        return new WasmObject(wasmInstance, memoryPointer, comparator);
+        return ofExistingOrDefault(wasmInstance, memoryPointer,
+                new WasmObject(wasmInstance, memoryPointer, comparator));
     }
 
     public static WasmObject ofExisting(Instance wasmInstance,
             int memoryPointer, BiPredicate<Integer, Integer> equalRelation,
             ToIntFunction<Integer> hasher) {
-        return new WasmObject(wasmInstance, memoryPointer, equalRelation,
-                hasher, null);
+        return ofExistingOrDefault(wasmInstance, memoryPointer,
+                new WasmObject(wasmInstance, memoryPointer, equalRelation, hasher, null));
     }
 
     /**
