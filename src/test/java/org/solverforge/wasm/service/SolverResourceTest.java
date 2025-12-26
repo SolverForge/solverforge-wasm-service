@@ -62,4 +62,85 @@ public class SolverResourceTest {
         assertThat(constraintAnalysis.score()).isEqualTo(SimpleScore.of(20));
 
     }
+
+    @Test
+    public void asyncSolveTest() throws Exception {
+        var planningProblem = TestUtils.getPlanningProblem();
+
+        // Start async solve
+        var asyncResponse = solverResource.solveAsync(planningProblem);
+        assertThat(asyncResponse.solveId()).isNotNull();
+        String solveId = asyncResponse.solveId();
+
+        // Check status - should be running or already terminated
+        var statusResponse = solverResource.getSolveStatus(solveId);
+        assertThat(statusResponse.state()).isIn("RUNNING", "TERMINATED");
+
+        // Wait for solve to complete (max 10 seconds)
+        for (int i = 0; i < 100 && "RUNNING".equals(statusResponse.state()); i++) {
+            Thread.sleep(100);
+            statusResponse = solverResource.getSolveStatus(solveId);
+        }
+
+        // Should now be terminated
+        assertThat(statusResponse.state()).isEqualTo("TERMINATED");
+        assertThat(statusResponse.bestScore()).isNotNull();
+
+        // Get best solution
+        var bestResponse = solverResource.getBestSolution(solveId);
+        assertThat(bestResponse.solution()).isNotNull();
+        assertThat(bestResponse.score()).isNotNull();
+
+        // Parse and verify solution
+        var solution = (Map) objectMapper.readerFor(Map.class).readValue(bestResponse.solution());
+        assertThat(solution).containsKeys("employees", "shifts");
+
+        // Clean up
+        solverResource.deleteSolve(solveId);
+    }
+
+    @Test
+    public void asyncSolveStopTest() throws Exception {
+        // Use a problem that takes longer to solve - increase termination time
+        var planningProblem = TestUtils.getPlanningProblem();
+
+        // Start async solve
+        var asyncResponse = solverResource.solveAsync(planningProblem);
+        String solveId = asyncResponse.solveId();
+
+        // Small delay to let solve start
+        Thread.sleep(50);
+
+        // Stop the solve
+        solverResource.stopSolve(solveId);
+
+        // Wait for termination
+        Thread.sleep(100);
+
+        // Should be terminated now
+        var statusResponse = solverResource.getSolveStatus(solveId);
+        assertThat(statusResponse.state()).isEqualTo("TERMINATED");
+
+        // Clean up
+        solverResource.deleteSolve(solveId);
+    }
+
+    @Test
+    public void asyncSolveNotFoundTest() {
+        // Test with non-existent solve ID
+        org.junit.jupiter.api.Assertions.assertThrows(
+            jakarta.ws.rs.NotFoundException.class,
+            () -> solverResource.getSolveStatus("non-existent-id")
+        );
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+            jakarta.ws.rs.NotFoundException.class,
+            () -> solverResource.getBestSolution("non-existent-id")
+        );
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+            jakarta.ws.rs.NotFoundException.class,
+            () -> solverResource.stopSolve("non-existent-id")
+        );
+    }
 }
