@@ -44,6 +44,18 @@ public class WasmObject implements Comparable<WasmObject> {
         }
     }
 
+    /**
+     * Clears the entity cache for the given WASM instance.
+     * Must be called when cloning solutions to prevent stale cached entities
+     * with outdated shadow variable state from being returned.
+     */
+    public static void clearCacheForInstance(Instance wasmInstance) {
+        var instanceCache = entityCache.get(wasmInstance);
+        if (instanceCache != null) {
+            instanceCache.clear();
+        }
+    }
+
     public static final Function<Integer, WasmObject> WRAPPING_INT = WasmObject::wrappingInt;
     public static final Function<Double, WasmObject> WRAPPING_DOUBLE = WasmObject::wrappingDouble;
     public static final Function<WasmObject, WasmList<WasmObject>> TO_LIST = WasmObject::asList;

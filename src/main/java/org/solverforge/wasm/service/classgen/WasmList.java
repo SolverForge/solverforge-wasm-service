@@ -71,6 +71,18 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
                 .computeIfAbsent(memoryPointer, ignored -> new WasmList<>(memoryPointer, itemClass));
     }
 
+    /**
+     * Clears the list cache for the given WASM instance.
+     * Must be called when cloning solutions to prevent stale cached lists
+     * with outdated item references from being returned.
+     */
+    public static void clearCacheForInstance(Instance wasmInstance) {
+        var instanceCache = wasmInstanceToListCache.get(wasmInstance);
+        if (instanceCache != null) {
+            instanceCache.clear();
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public static <Item_ extends WasmObject> WasmList<Item_> createNew(Class<Item_> itemClass) {
         var listAccessor = SolverResource.LIST_ACCESSOR.get();

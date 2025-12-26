@@ -22,6 +22,12 @@ public class WasmSolutionCloner implements SolutionCloner<WasmObject> {
         var allocator = SolverResource.ALLOCATOR.get();
         var wasmInstance = SolverResource.INSTANCE.get();
 
+        // Clear entity and list caches to ensure fresh objects after cloning.
+        // Without this, cached entities from the original solution would be returned
+        // with stale shadow variable state, causing "Unexpected unassigned position" errors.
+        WasmObject.clearCacheForInstance(wasmInstance);
+        WasmList.clearCacheForInstance(wasmInstance);
+
         try {
             var solutionClass = original.getClass();
             var constructor = solutionClass.getConstructor(Allocator.class, Instance.class, String.class);
