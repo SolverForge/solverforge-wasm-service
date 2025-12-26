@@ -63,32 +63,35 @@ public class HostFunctionProvider {
     /**
      * Creates all host functions needed by the WASM module.
      *
+     * CRITICAL: Order must match Rust host_functions.rs exactly!
+     * WASM imports functions by index, not by name.
+     *
      * @return List of host functions to be imported into the WASM instance
      */
     public List<HostFunction> createHostFunctions() {
         return List.of(
-                createParseSchedule(),
-                createScheduleString(),
-                createNewList(),
-                createGetItem(),
-                createSetItem(),
-                createSize(),
-                createAppend(),
-                createInsert(),
-                createRemove(),
-                createRound(),
-                createStringEquals(),
-                createListContainsString(),
-                createPrecomputed0(),
-                createPrecomputed1(),
-                createPrecomputed2(),
-                // Trigonometric functions
-                createSin(),
-                createCos(),
-                createAsin(),
-                createAcos(),
-                createAtan(),
-                createAtan2()
+                // Order matches Rust HostFunctionRegistry::with_standard_functions()
+                createStringEquals(),       // 0
+                createListContainsString(), // 1
+                createNewList(),            // 2
+                createGetItem(),            // 3
+                createSize(),               // 4
+                createAppend(),             // 5
+                createSetItem(),            // 6
+                createInsert(),             // 7
+                createRemove(),             // 8
+                createParseSchedule(),      // 9
+                createScheduleString(),     // 10
+                createRound(),              // 11
+                createSin(),                // 12
+                createCos(),                // 13
+                createAsin(),               // 14
+                createAcos(),               // 15
+                createAtan(),               // 16
+                createAtan2(),              // 17
+                createPrecomputed0(),       // 18
+                createPrecomputed1(),       // 19
+                createPrecomputed2()        // 20
         );
     }
 
