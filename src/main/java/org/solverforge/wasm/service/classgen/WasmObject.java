@@ -180,7 +180,15 @@ public class WasmObject implements Comparable<WasmObject> {
             return null;
         }
         var instanceCache = entityCache.computeIfAbsent(wasmInstance, _ -> new ConcurrentHashMap<>());
-        return (Item_) instanceCache.computeIfAbsent(memoryPointer, factory::apply);
+        // Use get + putIfAbsent instead of computeIfAbsent to avoid "recursive update" errors
+        // when the factory creates objects that themselves trigger cache lookups
+        var existing = instanceCache.get(memoryPointer);
+        if (existing != null) {
+            return (Item_) existing;
+        }
+        var created = factory.apply(memoryPointer);
+        var prev = instanceCache.putIfAbsent(memoryPointer, created);
+        return (Item_) (prev != null ? prev : created);
     }
 
     @Override
