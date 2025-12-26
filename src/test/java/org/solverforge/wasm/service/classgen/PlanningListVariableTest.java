@@ -171,15 +171,14 @@ public class PlanningListVariableTest {
         entityFields.put("id", new FieldDescriptor("String",
                 new DomainAccessor("getId", null),
                 List.of(new DomainPlanningId())));
-        // Regular list, not a planning list variable - uses ProblemFactCollectionProperty to ensure processing
-        entityFields.put("tags", new FieldDescriptor("String[]",
-                new DomainAccessor("getTags", "setTags"),
-                List.of(new DomainPlanningEntityCollectionProperty())));
 
         var solutionFields = new LinkedHashMap<String, FieldDescriptor>();
         solutionFields.put("entities", new FieldDescriptor("Entity[]",
                 new DomainAccessor("getEntities", "setEntities"),
                 List.of(new DomainPlanningEntityCollectionProperty())));
+        solutionFields.put("tags", new FieldDescriptor("String[]",
+                new DomainAccessor("getTags", "setTags"),
+                List.of(new DomainValueRangeProvider("tags"))));
         solutionFields.put("score", new FieldDescriptor("HardSoftScore",
                 List.of(new DomainPlanningScore())));
 
@@ -194,8 +193,8 @@ public class PlanningListVariableTest {
 
         classGenerator.prepareClassesForPlanningProblem(planningProblem);
 
-        Class<?> entityClass = classLoader.getClassForDomainClassName("Entity");
-        Method getTags = entityClass.getMethod("getTags");
+        Class<?> solutionClass = classLoader.getClassForDomainClassName("Solution");
+        Method getTags = solutionClass.getMethod("getTags");
 
         // Verify the generic return type is WasmList<String>, not something else
         assertThat(getTags.getGenericReturnType()).isInstanceOf(ParameterizedType.class);
