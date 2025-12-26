@@ -457,8 +457,11 @@ public class HostFunctionProvider {
             case "LocalDate" -> {
                 // Store as epoch day (long)
                 // Accept either ISO date string (e.g., "2024-01-15") or epoch day integer
+                // Null values are stored as 0
                 long epochDay;
-                if (value.isNumber()) {
+                if (value.isNull()) {
+                    epochDay = 0;
+                } else if (value.isNumber()) {
                     epochDay = value.asLong();
                 } else {
                     LocalDate date = LocalDate.parse(value.asText());
@@ -469,8 +472,14 @@ public class HostFunctionProvider {
             }
             case "LocalDateTime" -> {
                 // Parse ISO datetime string (e.g., "2024-01-15T14:30:00") and store as epoch second (long)
-                LocalDateTime dateTime = LocalDateTime.parse(value.asText());
-                long epochSecond = dateTime.toEpochSecond(ZoneOffset.UTC);
+                // Null values are stored as 0
+                long epochSecond;
+                if (value.isNull()) {
+                    epochSecond = 0;
+                } else {
+                    LocalDateTime dateTime = LocalDateTime.parse(value.asText());
+                    epochSecond = dateTime.toEpochSecond(ZoneOffset.UTC);
+                }
                 instance.memory().writeI32(ptr, (int) epochSecond);
                 instance.memory().writeI32(ptr + 4, (int) (epochSecond >> 32));
             }
