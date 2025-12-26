@@ -37,8 +37,10 @@ import org.solverforge.wasm.service.dto.DomainObject;
 import org.solverforge.wasm.service.dto.FieldDescriptor;
 import org.solverforge.wasm.service.dto.PlanningProblem;
 import org.solverforge.wasm.service.dto.annotation.DomainCascadingUpdateShadowVariable;
+import org.solverforge.wasm.service.dto.annotation.DomainPlanningListVariable;
 import org.solverforge.wasm.service.dto.annotation.DomainPlanningScore;
 import org.solverforge.wasm.service.dto.annotation.DomainPlanningVariable;
+import org.solverforge.wasm.service.dto.annotation.DomainValueRangeProvider;
 
 import com.dylibso.chicory.runtime.ExportFunction;
 import com.dylibso.chicory.runtime.Instance;
@@ -148,11 +150,43 @@ public class DomainObjectClassGenerator {
 
     public void prepareClassesForPlanningProblem(PlanningProblem planningProblem) {
         for (var domainEntry : planningProblem.getDomainObjectMap().entrySet()) {
-            prepareClassForDomainObject(domainEntry.getValue());
+            prepareClassForDomainObject(domainEntry.getValue(), planningProblem);
         }
     }
 
-    public void prepareClassForDomainObject(DomainObject domainObject) {
+    /**
+     * Looks up the element type of a value range provider by its ID.
+     * Returns the element class name (e.g., "Visit") or null if not found.
+     */
+    private String lookupValueRangeProviderElementType(PlanningProblem planningProblem, String valueRangeProviderId) {
+        for (var domainObject : planningProblem.getDomainObjectMap().values()) {
+            for (var field : domainObject.getFieldDescriptorMap().entrySet()) {
+                var annotations = field.getValue().getAnnotations();
+                if (annotations == null) continue;
+                for (var annotation : annotations) {
+                    if (annotation instanceof DomainValueRangeProvider vrp) {
+                        // Check if this is the value range provider we're looking for
+                        // If ID is null/empty, it uses the field name as the ID
+                        String vrpId = vrp.getId();
+                        if (vrpId == null || vrpId.isEmpty()) {
+                            vrpId = field.getKey();
+                        }
+                        if (vrpId.equals(valueRangeProviderId)) {
+                            // Found it - extract element type from the field type
+                            String fieldType = field.getValue().getType();
+                            if (fieldType.endsWith("[]")) {
+                                return fieldType.substring(0, fieldType.length() - 2);
+                            }
+                            return fieldType;
+                        }
+                    }
+                }
+            }
+        }
+        throw new IllegalStateException("Value range provider '" + valueRangeProviderId + "' not found in domain model");
+    }
+
+    public void prepareClassForDomainObject(DomainObject domainObject, PlanningProblem planningProblem) {
         var wasmOffsets = calculateWasmOffsets(domainObject);
         var classFile = ClassFile.of();
 
@@ -261,16 +295,21 @@ public class DomainObjectClassGenerator {
                 var isPlanningScore = false;
                 var isPlanningVariable = false;
                 var isShadowVariable = false;
+                DomainPlanningListVariable planningListVariable = null;
                 for (var annotation : annotations) {
                     isPlanningEntity |= annotation.definesPlanningEntity();
                     isPlanningSolution |= annotation.definesPlanningSolution();
                     isPlanningScore |= annotation instanceof DomainPlanningScore;
                     isPlanningVariable |= annotation instanceof DomainPlanningVariable;
                     isShadowVariable |= annotation.isShadowVariable();
+                    if (annotation instanceof DomainPlanningListVariable plv) {
+                        planningListVariable = plv;
+                    }
                 }
                 var finalIsPlanningScore = isPlanningScore;
                 var finalIsPlanningVariable = isPlanningVariable;
                 var finalIsShadowVariable = isShadowVariable;
+                var finalPlanningListVariable = planningListVariable;
 
                 var wrapperTypeDesc = getWasmWrapperTypeDesc(field.getValue().getType());
                 classBuilder.withField(field.getKey(), wrapperTypeDesc, ClassFile.ACC_PRIVATE);
@@ -285,7 +324,15 @@ public class DomainObjectClassGenerator {
                             }
                             methodBuilder.with(RuntimeVisibleAnnotationsAttribute.of(annotationsList));
                             if (field.getValue().getType().endsWith("[]")) {
-                                var innerType = getWasmTypeDesc(field.getValue().getType().substring(0, field.getValue().getType().length() - 2));
+                                // For planning list variables, use the element type from the value range provider
+                                ClassDesc innerType;
+                                if (finalPlanningListVariable != null && finalPlanningListVariable.getValueRangeProviderRefs().length > 0) {
+                                    String elementClassName = lookupValueRangeProviderElementType(
+                                            planningProblem, finalPlanningListVariable.getValueRangeProviderRefs()[0]);
+                                    innerType = ClassDesc.ofInternalName(elementClassName);
+                                } else {
+                                    innerType = getWasmTypeDesc(field.getValue().getType().substring(0, field.getValue().getType().length() - 2));
+                                }
                                 methodBuilder.with(SignatureAttribute.of(MethodSignature.of(
                                         Signature.ClassTypeSig.of(getDescriptor(WasmList.class), Signature.TypeArg.of(
                                                 Signature.ClassTypeSig.of(innerType)))
