@@ -10,16 +10,20 @@ import ai.timefold.solver.core.impl.domain.common.ReflectionHelper;
 import org.solverforge.wasm.service.FunctionCache;
 import org.solverforge.wasm.service.SolverResource;
 
+import org.jboss.logging.Logger;
 import org.jspecify.annotations.NonNull;
 
 import com.dylibso.chicory.runtime.Instance;
 
 public class WasmSolutionCloner implements SolutionCloner<WasmObject> {
+    private static final Logger LOG = Logger.getLogger(WasmSolutionCloner.class);
     public static Cleaner solutionCleaner = Cleaner.create();
 
     @Override
     public @NonNull WasmObject cloneSolution(@NonNull WasmObject original) {
+        LOG.info("cloneSolution: starting clone");
         var serialized = original.toString();
+        LOG.info("cloneSolution: serialized length=" + serialized.length());
         var allocator = SolverResource.ALLOCATOR.get();
         var wasmInstance = SolverResource.INSTANCE.get();
 
@@ -36,7 +40,9 @@ public class WasmSolutionCloner implements SolutionCloner<WasmObject> {
         try {
             var solutionClass = original.getClass();
             var constructor = solutionClass.getConstructor(Allocator.class, Instance.class, String.class);
+            LOG.info("cloneSolution: calling constructor");
             var out = constructor.newInstance(allocator, wasmInstance, serialized);
+            LOG.info("cloneSolution: constructor returned, pointer=" + out.getMemoryPointer());
             var outMemoryLocation = out.getMemoryPointer();
             solutionCleaner.register(out, () -> {
                 allocator.freeSolution(outMemoryLocation);
@@ -47,6 +53,7 @@ public class WasmSolutionCloner implements SolutionCloner<WasmObject> {
                     var propertyName = method.getName().substring(3);
                     propertyName = propertyName.substring(0, 1).toLowerCase() + propertyName.substring(1);
                     ReflectionHelper.getSetterMethod(solutionClass, propertyName).invoke(out, method.invoke(original));
+                    LOG.info("cloneSolution: complete, returning cloned solution");
                     return out;
                 }
             }
