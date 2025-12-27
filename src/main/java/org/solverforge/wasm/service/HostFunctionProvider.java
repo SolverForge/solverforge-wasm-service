@@ -449,7 +449,15 @@ public class HostFunctionProvider {
 
                     // Extract planning ID from full entity object
                     Object planningId = findPlanningId(elementDef, elementJson);
-                    element = entityMap.get(planningId);
+                    Integer ptr = entityMap.get(planningId);
+                    if (ptr == null) {
+                        throw new IllegalStateException(
+                            "Entity " + elementType + " with planning ID '" + planningId +
+                            "' (type: " + (planningId != null ? planningId.getClass().getSimpleName() : "null") +
+                            ") not found. Available IDs: " + entityMap.keySet() +
+                            ". JSON: " + elementJson);
+                    }
+                    element = ptr;
                     append.apply(list, element);
                 }
             }
