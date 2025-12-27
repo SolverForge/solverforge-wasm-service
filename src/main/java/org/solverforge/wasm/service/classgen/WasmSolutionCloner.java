@@ -7,6 +7,7 @@ import ai.timefold.solver.core.api.domain.solution.PlanningScore;
 import ai.timefold.solver.core.api.domain.solution.cloner.SolutionCloner;
 import ai.timefold.solver.core.api.solver.Solver;
 import ai.timefold.solver.core.impl.domain.common.ReflectionHelper;
+import org.solverforge.wasm.service.FunctionCache;
 import org.solverforge.wasm.service.SolverResource;
 
 import org.jspecify.annotations.NonNull;
@@ -22,11 +23,15 @@ public class WasmSolutionCloner implements SolutionCloner<WasmObject> {
         var allocator = SolverResource.ALLOCATOR.get();
         var wasmInstance = SolverResource.INSTANCE.get();
 
-        // Clear entity and list caches to ensure fresh objects after cloning.
+        // Clear entity, list, and function caches to ensure fresh objects after cloning.
         // Without this, cached entities from the original solution would be returned
         // with stale shadow variable state, causing "Unexpected unassigned position" errors.
         WasmObject.clearCacheForInstance(wasmInstance);
         WasmList.clearCacheForInstance(wasmInstance);
+        FunctionCache functionCache = SolverResource.FUNCTION_CACHE.get();
+        if (functionCache != null) {
+            functionCache.clear();
+        }
 
         try {
             var solutionClass = original.getClass();
