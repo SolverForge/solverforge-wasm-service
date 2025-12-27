@@ -11,6 +11,7 @@ import org.solverforge.wasm.service.dto.DomainObject;
 import org.solverforge.wasm.service.dto.FieldDescriptor;
 import org.solverforge.wasm.service.dto.PlanningProblem;
 import org.solverforge.wasm.service.dto.annotation.DomainPlanningScore;
+import org.solverforge.wasm.service.dto.annotation.DomainValueRangeProvider;
 
 import com.dylibso.chicory.runtime.ExportFunction;
 import com.dylibso.chicory.runtime.HostFunction;
@@ -184,6 +185,12 @@ public class HostFunctionProvider {
                 .anyMatch(a -> a instanceof DomainPlanningScore);
     }
 
+    private boolean hasValueRangeProviderAnnotation(FieldDescriptor field) {
+        if (field.getAnnotations() == null) return false;
+        return field.getAnnotations().stream()
+                .anyMatch(a -> a instanceof DomainValueRangeProvider);
+    }
+
     // ========== hparseSchedule ==========
 
     /**
@@ -209,39 +216,61 @@ public class HostFunctionProvider {
                         String solutionClassName = findSolutionClass();
                         DomainObject solutionDef = domainObjectMap.get(solutionClassName);
 
-                        // Entity maps will be populated with actual WASM pointers during second pass
+                        // Entity maps will be populated with actual WASM pointers
                         Map<String, Map<Object, Integer>> entityMaps = new HashMap<>();
+                        Map<String, Integer> listPointers = new HashMap<>();
 
                         // Allocate solution object
                         int solutionSize = calculateObjectSize(solutionDef);
                         int solution = (int) alloc.apply(solutionSize)[0];
 
-                        // Parse all fields and write to memory
+                        // FIRST PASS: Parse value range provider collections
+                        // This ensures entityMaps is populated before parsing entity collections
+                        // that reference these entities (e.g., Vehicle.visits references Visit entities)
                         int offset = 0;
-                        Map<String, Integer> listPointers = new HashMap<>();
-
                         for (var entry : solutionDef.getFieldDescriptorMap().entrySet()) {
                             String fieldName = entry.getKey();
                             FieldDescriptor field = entry.getValue();
 
-                            // Align offset for this field's type
+                            int fieldAlignment = getFieldAlignment(field.getType());
+                            offset = alignOffset(offset, fieldAlignment);
+
+                            if (field.getType().endsWith("[]") && hasValueRangeProviderAnnotation(field)) {
+                                int listPtr = parseCollectionField(instance, alloc, newList, append,
+                                        fieldName, field, parsedJson, entityMaps, listPointers);
+                                instance.memory().writeI32(solution + offset, listPtr);
+                                listPointers.put(field.getType().replace("[]", ""), listPtr);
+                            }
+
+                            offset += getFieldSize(field.getType());
+                        }
+
+                        // SECOND PASS: Parse all other fields
+                        offset = 0;
+                        for (var entry : solutionDef.getFieldDescriptorMap().entrySet()) {
+                            String fieldName = entry.getKey();
+                            FieldDescriptor field = entry.getValue();
+
                             int fieldAlignment = getFieldAlignment(field.getType());
                             offset = alignOffset(offset, fieldAlignment);
 
                             if (hasPlanningScoreAnnotation(field)) {
-                                // Skip score field - it's not in the input JSON
+                                offset += getFieldSize(field.getType());
+                                continue;
+                            }
+
+                            // Skip value range providers - already parsed in first pass
+                            if (field.getType().endsWith("[]") && hasValueRangeProviderAnnotation(field)) {
                                 offset += getFieldSize(field.getType());
                                 continue;
                             }
 
                             if (field.getType().endsWith("[]")) {
-                                // Collection field
                                 int listPtr = parseCollectionField(instance, alloc, newList, append,
                                         fieldName, field, parsedJson, entityMaps, listPointers);
                                 instance.memory().writeI32(solution + offset, listPtr);
                                 listPointers.put(field.getType().replace("[]", ""), listPtr);
                             } else if (parsedJson.has(fieldName)) {
-                                // Primitive or object field
                                 writePrimitiveField(instance, alloc, solution + offset,
                                         field, parsedJson.get(fieldName));
                             }
