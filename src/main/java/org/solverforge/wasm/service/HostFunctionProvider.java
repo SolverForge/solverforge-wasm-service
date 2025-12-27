@@ -437,8 +437,30 @@ public class HostFunctionProvider {
             } else {
                 DomainObject elementDef = domainObjectMap.get(elementType);
                 if (elementDef != null) {
-                    int element = parseObject(instance, alloc, newList, append,
-                            elementType, elementDef, elementJson, entityMaps, listPointers);
+                    int element;
+                    // For entity types, try to look up canonical entity by planning ID
+                    // This ensures list variables reference the same entities as value range providers
+                    Map<Object, Integer> entityMap = entityMaps.get(elementType);
+                    Integer listPtr = listPointers.get(elementType);
+
+                    if (entityMap != null && listPtr != null) {
+                        // Extract planning ID from the element JSON
+                        Object planningId = findPlanningId(elementDef, elementJson);
+                        if (planningId != null && entityMap.containsKey(planningId)) {
+                            // Found canonical entity - look up its pointer from the list
+                            int index = entityMap.get(planningId);
+                            var getItem = instance.export("getItem");
+                            element = (int) getItem.apply(listPtr, index)[0];
+                        } else {
+                            // Not found - create new object (shouldn't happen in well-formed data)
+                            element = parseObject(instance, alloc, newList, append,
+                                    elementType, elementDef, elementJson, entityMaps, listPointers);
+                        }
+                    } else {
+                        // No entity map for this type - parse normally
+                        element = parseObject(instance, alloc, newList, append,
+                                elementType, elementDef, elementJson, entityMaps, listPointers);
+                    }
                     append.apply(list, element);
                 }
             }
