@@ -447,22 +447,17 @@ public class HostFunctionProvider {
                     // This ensures list variables reference the same entities as value range providers
                     Map<Object, Integer> entityMap = entityMaps.get(elementType);
 
-                    if (entityMap != null) {
-                        // Extract planning ID from the element JSON
-                        Object planningId = findPlanningId(elementDef, elementJson);
-                        if (planningId != null && entityMap.containsKey(planningId)) {
-                            // Found canonical entity - use its actual WASM pointer
-                            element = entityMap.get(planningId);
-                        } else {
-                            // Not found - create new object (shouldn't happen in well-formed data)
-                            element = parseObject(instance, alloc, newList, append,
-                                    elementType, elementDef, elementJson, entityMaps, listPointers);
-                        }
+                    // Element is a planning ID - look up canonical entity
+                    Object planningId;
+                    if (elementJson.isTextual()) {
+                        planningId = elementJson.asText();
+                    } else if (elementJson.isInt()) {
+                        planningId = elementJson.asInt();
                     } else {
-                        // No entity map for this type - parse normally
-                        element = parseObject(instance, alloc, newList, append,
-                                elementType, elementDef, elementJson, entityMaps, listPointers);
+                        planningId = elementJson.asLong();
                     }
+
+                    element = entityMap.get(planningId);
                     append.apply(list, element);
                 }
             }
