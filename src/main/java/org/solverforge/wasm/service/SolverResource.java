@@ -359,13 +359,9 @@ public class SolverResource {
                 LIST_ACCESSOR.set(listAccessor);
                 ALLOCATOR.set(allocator);
                 try {
-                    LOG.info("Starting solver.solve()");
                     solver.solve(solverInput);
-                    LOG.info("solver.solve() completed normally");
                 } catch (Exception e) {
                     LOG.error("Solve failed", e);
-                } catch (Throwable t) {
-                    LOG.error("Solve failed with Throwable", t);
                 } finally {
                     solving.set(false);
                     GENERATED_CLASS_LOADER.remove();

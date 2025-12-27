@@ -326,30 +326,17 @@ public class HostFunctionProvider {
 
         for (int i = 0; i < arrayNode.size(); i++) {
             JsonNode elementJson = arrayNode.get(i);
-            int element;
 
-            // If the element is a string (ID reference) and we have an entity map for this type,
-            // look up the entity pointer instead of parsing it as an object.
-            // This handles planning list variables where the JSON stores IDs but Java needs entity references.
-            if (elementJson.isTextual() && entityMaps.containsKey(elementType)) {
-                String id = elementJson.asText();
-                Integer ptr = entityMaps.get(elementType).get(id);
-                if (ptr == null) {
-                    throw new IllegalStateException("Entity " + elementType + " with id '" + id + "' not found. " +
-                            "Available: " + entityMaps.get(elementType).keySet());
-                }
-                element = ptr;
-            } else {
-                element = parseObject(instance, alloc, newList, append, elementType, elementDef,
-                        elementJson, entityMaps, listPointers);
+            // Parse the full object and register in entityMaps
+            int element = parseObject(instance, alloc, newList, append, elementType, elementDef,
+                    elementJson, entityMaps, listPointers);
 
-                // Store actual WASM pointer in entityMaps for later lookups by ID
-                if (elementDef != null) {
-                    Object planningId = findPlanningId(elementDef, elementJson);
-                    if (planningId != null) {
-                        entityMaps.computeIfAbsent(elementType, k -> new HashMap<>())
-                                .put(planningId, element);
-                    }
+            // Store WASM pointer in entityMaps for later lookups by planning ID
+            if (elementDef != null) {
+                Object planningId = findPlanningId(elementDef, elementJson);
+                if (planningId != null) {
+                    entityMaps.computeIfAbsent(elementType, k -> new HashMap<>())
+                            .put(planningId, element);
                 }
             }
             append.apply(list, element);
