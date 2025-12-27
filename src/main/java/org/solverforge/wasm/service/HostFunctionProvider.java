@@ -209,48 +209,15 @@ public class HostFunctionProvider {
                         String solutionClassName = findSolutionClass();
                         DomainObject solutionDef = domainObjectMap.get(solutionClassName);
 
-                        // We need to parse collections first to build lookup maps for references
+                        // Entity maps will be populated with actual WASM pointers during second pass
                         Map<String, Map<Object, Integer>> entityMaps = new HashMap<>();
-
-                        // First pass: parse all collections and build entity maps
-                        int offset = 0;
-                        for (var entry : solutionDef.getFieldDescriptorMap().entrySet()) {
-                            String fieldName = entry.getKey();
-                            FieldDescriptor field = entry.getValue();
-
-                            // Align offset for this field's type
-                            int fieldAlignment = getFieldAlignment(field.getType());
-                            offset = alignOffset(offset, fieldAlignment);
-
-                            if (field.getType().endsWith("[]") && parsedJson.has(fieldName)) {
-                                String elementType = field.getType().replace("[]", "");
-                                DomainObject elementDef = domainObjectMap.get(elementType);
-
-                                if (elementDef != null) {
-                                    var arrayNode = parsedJson.get(fieldName);
-                                    Map<Object, Integer> entityMap = new HashMap<>();
-
-                                    for (int i = 0; i < arrayNode.size(); i++) {
-                                        JsonNode elementJson = arrayNode.get(i);
-                                        // Find the planning ID field to use as key
-                                        Object planningId = findPlanningId(elementDef, elementJson);
-                                        if (planningId != null) {
-                                            entityMap.put(planningId, i);
-                                        }
-                                    }
-
-                                    entityMaps.put(elementType, entityMap);
-                                }
-                            }
-                            offset += getFieldSize(field.getType());
-                        }
 
                         // Allocate solution object
                         int solutionSize = calculateObjectSize(solutionDef);
                         int solution = (int) alloc.apply(solutionSize)[0];
 
-                        // Second pass: parse all fields and write to memory
-                        offset = 0;
+                        // Parse all fields and write to memory
+                        int offset = 0;
                         Map<String, Integer> listPointers = new HashMap<>();
 
                         for (var entry : solutionDef.getFieldDescriptorMap().entrySet()) {
@@ -346,6 +313,15 @@ public class HostFunctionProvider {
             } else {
                 element = parseObject(instance, alloc, newList, append, elementType, elementDef,
                         elementJson, entityMaps, listPointers);
+
+                // Store actual WASM pointer in entityMaps for later lookups by ID
+                if (elementDef != null) {
+                    Object planningId = findPlanningId(elementDef, elementJson);
+                    if (planningId != null) {
+                        entityMaps.computeIfAbsent(elementType, k -> new HashMap<>())
+                                .put(planningId, element);
+                    }
+                }
             }
             append.apply(list, element);
         }
@@ -441,16 +417,13 @@ public class HostFunctionProvider {
                     // For entity types, try to look up canonical entity by planning ID
                     // This ensures list variables reference the same entities as value range providers
                     Map<Object, Integer> entityMap = entityMaps.get(elementType);
-                    Integer listPtr = listPointers.get(elementType);
 
-                    if (entityMap != null && listPtr != null) {
+                    if (entityMap != null) {
                         // Extract planning ID from the element JSON
                         Object planningId = findPlanningId(elementDef, elementJson);
                         if (planningId != null && entityMap.containsKey(planningId)) {
-                            // Found canonical entity - look up its pointer from the list
-                            int index = entityMap.get(planningId);
-                            var getItem = instance.export("getItem");
-                            element = (int) getItem.apply(listPtr, index)[0];
+                            // Found canonical entity - use its actual WASM pointer
+                            element = entityMap.get(planningId);
                         } else {
                             // Not found - create new object (shouldn't happen in well-formed data)
                             element = parseObject(instance, alloc, newList, append,
@@ -540,11 +513,10 @@ public class HostFunctionProvider {
             return;
         }
 
-        // Get the entity map for this type
+        // Get the entity map for this type (contains actual WASM pointers)
         Map<Object, Integer> entityMap = entityMaps.get(refType);
-        Integer listPtr = listPointers.get(refType);
 
-        if (entityMap == null || listPtr == null) {
+        if (entityMap == null) {
             instance.memory().writeI32(ptr, 0);
             return;
         }
@@ -554,10 +526,8 @@ public class HostFunctionProvider {
         Object planningId = findPlanningId(refDef, value);
 
         if (planningId != null && entityMap.containsKey(planningId)) {
-            int index = entityMap.get(planningId);
-            // Get the actual pointer from the list
-            var getItem = instance.export("getItem");
-            int entityPtr = (int) getItem.apply(listPtr, index)[0];
+            // entityMap now stores actual WASM pointers directly
+            int entityPtr = entityMap.get(planningId);
             instance.memory().writeI32(ptr, entityPtr);
         } else {
             instance.memory().writeI32(ptr, 0);
