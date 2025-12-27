@@ -447,16 +447,8 @@ public class HostFunctionProvider {
                     // This ensures list variables reference the same entities as value range providers
                     Map<Object, Integer> entityMap = entityMaps.get(elementType);
 
-                    // Element is a planning ID - look up canonical entity
-                    Object planningId;
-                    if (elementJson.isTextual()) {
-                        planningId = elementJson.asText();
-                    } else if (elementJson.isInt()) {
-                        planningId = elementJson.asInt();
-                    } else {
-                        planningId = elementJson.asLong();
-                    }
-
+                    // Extract planning ID from full entity object
+                    Object planningId = findPlanningId(elementDef, elementJson);
                     element = entityMap.get(planningId);
                     append.apply(list, element);
                 }
