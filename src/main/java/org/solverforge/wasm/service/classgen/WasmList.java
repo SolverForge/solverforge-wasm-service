@@ -26,6 +26,12 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
     private int cachedSize;
     private List<Item_> cachedItemList;
 
+    /**
+     * The entity that owns this list (e.g., the Vehicle that has this visits list).
+     * Used to invalidate the owner's function cache when the list is modified.
+     */
+    private WasmObject owner;
+
     public WasmList(WasmListAccessor listAccessor, WasmObject wasmList,
             Class<Item_> itemClass) {
         this.listAccessor = listAccessor;
@@ -83,6 +89,28 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
         }
     }
 
+    /**
+     * Sets the entity that owns this list.
+     * Called by the generated getter to establish ownership.
+     * Invalidates the owner's cache immediately to clear any stale entries.
+     */
+    public void setOwner(WasmObject owner) {
+        if (owner != null) {
+            owner.invalidateFunctionCache();
+        }
+        this.owner = owner;
+    }
+
+    /**
+     * Invalidates the owner's function cache if an owner is set.
+     * Called when the list is modified (add/remove/set).
+     */
+    private void invalidateOwnerCache() {
+        if (owner != null) {
+            owner.invalidateFunctionCache();
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public static <Item_ extends WasmObject> WasmList<Item_> createNew(Class<Item_> itemClass) {
         var listAccessor = SolverResource.LIST_ACCESSOR.get();
@@ -102,6 +130,7 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
         var old = get(index);
         listAccessor.setItem(wasmList, index, element);
         cachedItemList.set(index, element);
+        invalidateOwnerCache();
         return old;
     }
 
@@ -120,6 +149,7 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
             cachedItemList.add(index, element);
         }
         cachedSize++;
+        invalidateOwnerCache();
     }
 
     @Override
@@ -128,6 +158,7 @@ public final class WasmList<Item_ extends WasmObject> extends AbstractList<Item_
         listAccessor.remove(wasmList, index);
         cachedItemList.remove(index);
         cachedSize--;
+        invalidateOwnerCache();
         return old;
     }
 

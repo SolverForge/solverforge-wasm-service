@@ -674,6 +674,11 @@ public class DomainObjectClassGenerator {
                 if (fieldDescriptor.getType().endsWith("[]")) {
                     codeBuilder.loadConstant(getWasmTypeDesc(fieldDescriptor.getType().substring(0, fieldDescriptor.getType().length() - 2)));
                     codeBuilder.invokestatic(getDescriptor(WasmList.class), "ofExisting", MethodTypeDesc.of(getDescriptor(WasmList.class), intDesc, getDescriptor(Class.class)));
+
+                    // Set owner on the list for cache invalidation when list is modified
+                    codeBuilder.dup();  // duplicate list reference (keep one for return)
+                    codeBuilder.aload(0);  // load 'this' (the owner entity)
+                    codeBuilder.invokevirtual(getDescriptor(WasmList.class), "setOwner", MethodTypeDesc.of(voidDesc, wasmObjectDesc));
                 } else {
                     codeBuilder.aload(0);
                     codeBuilder.getfield(wasmObjectDesc, "wasmInstance", instanceDesc);
@@ -740,6 +745,11 @@ public class DomainObjectClassGenerator {
         // Use the provided element type (e.g., Visit) instead of the field's declared element type (e.g., String)
         codeBuilder.loadConstant(elementType);
         codeBuilder.invokestatic(getDescriptor(WasmList.class), "ofExisting", MethodTypeDesc.of(getDescriptor(WasmList.class), intDesc, getDescriptor(Class.class)));
+
+        // Set owner on the list for cache invalidation when list is modified
+        codeBuilder.dup();  // duplicate list reference (keep one for return)
+        codeBuilder.aload(0);  // load 'this' (the owner entity)
+        codeBuilder.invokevirtual(getDescriptor(WasmList.class), "setOwner", MethodTypeDesc.of(voidDesc, wasmObjectDesc));
     }
 
     private void writeWasmFieldUsingAccessor(FieldDescriptor fieldDescriptor, CodeBuilder codeBuilder, Consumer<CodeBuilder> valueBuilder) {
