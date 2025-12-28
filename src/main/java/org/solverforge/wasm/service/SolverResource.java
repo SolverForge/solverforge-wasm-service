@@ -206,27 +206,6 @@ public class SolverResource {
             solverConfig.withTerminationConfig(planningProblem.terminationConfig());
 
             var solverFactory = SolverFactory.create(solverConfig);
-
-            // Diagnostic logging for cascading update chain
-            var defaultSolverFactory = (ai.timefold.solver.core.impl.solver.DefaultSolverFactory<?>) solverFactory;
-            var solutionDescriptor = defaultSolverFactory.getSolutionDescriptor();
-            var listVarDesc = solutionDescriptor.getListVariableDescriptor();
-            LOG.infof("ListVariableDescriptor: %s", listVarDesc != null ? listVarDesc.getVariableName() : "NULL");
-
-            for (var entityDesc : solutionDescriptor.getEntityDescriptors()) {
-                LOG.infof("Entity: %s", entityDesc.getEntityClass().getSimpleName());
-                var cascadingDescs = entityDesc.getDeclaredCascadingUpdateShadowVariableDescriptors();
-                LOG.infof("  CascadingUpdateShadowVariableDescriptors: %d", cascadingDescs.size());
-                for (var cascDesc : cascadingDescs) {
-                    LOG.infof("    - %s (targetMethod: %s)", cascDesc.getVariableName(), cascDesc.getTargetMethodName());
-                }
-                var shadowDescs = entityDesc.getDeclaredShadowVariableDescriptors();
-                LOG.infof("  ShadowVariableDescriptors: %d", shadowDescs.size());
-                for (var shadowDesc : shadowDescs) {
-                    LOG.infof("    - %s (class: %s)", shadowDesc.getVariableName(), shadowDesc.getClass().getSimpleName());
-                }
-            }
-
             var solverInput = convertPlanningProblem(wasmInstance, classLoader, planningProblem);
 
             return resultFunction.apply(solverInput, solverFactory);

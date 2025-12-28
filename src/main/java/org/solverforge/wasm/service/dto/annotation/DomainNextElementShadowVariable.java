@@ -36,8 +36,17 @@ public final class DomainNextElementShadowVariable implements PlanningAnnotation
     }
 
     /**
+     * Shadow variables define a planning entity because they're only valid on entities.
+     */
+    @Override
+    public boolean definesPlanningEntity() {
+        return true;
+    }
+
+    /**
      * Shadow variables count as "planning variable or shadow variable" for entity validation.
      */
+    @Override
     public boolean isShadowVariable() {
         return true;
     }
