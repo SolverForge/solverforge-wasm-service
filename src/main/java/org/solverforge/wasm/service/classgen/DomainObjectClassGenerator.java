@@ -415,8 +415,10 @@ public class DomainObjectClassGenerator {
                                 }
                                 codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
 
-                                // Invalidate predicate cache when planning variable changes
-                                if (finalIsPlanningVariable) {
+                                // Invalidate predicate cache when planning or shadow variable changes
+                                // Shadow variables change when the solution changes (e.g., visit moved between vehicles)
+                                // and cached constraint results would be stale
+                                if (finalIsPlanningVariable || finalIsShadowVariable) {
                                     codeBuilder.aload(0);
                                     codeBuilder.invokevirtual(wasmObjectDesc, "invalidateFunctionCache", MethodTypeDesc.of(voidDesc));
                                 }
