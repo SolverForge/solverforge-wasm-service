@@ -12,7 +12,7 @@ import ai.timefold.solver.core.api.domain.variable.PlanningListVariable;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public final class DomainPlanningListVariable implements PlanningAnnotation {
+public final class DomainPlanningListVariable implements PlanningVariableAnnotation {
     private final boolean allowsUnassignedValues;
     private final String[] valueRangeProviderRefs;
 

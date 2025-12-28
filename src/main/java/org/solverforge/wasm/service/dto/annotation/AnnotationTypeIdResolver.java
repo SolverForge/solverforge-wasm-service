@@ -18,7 +18,7 @@ public class AnnotationTypeIdResolver implements TypeIdResolver {
     @Override
     public void init(JavaType baseType) {
         record Pair(String id, JavaType type) {}
-        idToType = Arrays.stream(PlanningAnnotation.class.getPermittedSubclasses())
+        idToType = getAllConcretePermittedClasses(PlanningAnnotation.class)
                 .map(c -> {
                     try {
                         var instance = (PlanningAnnotation) c.getConstructor().newInstance();
@@ -28,6 +28,25 @@ public class AnnotationTypeIdResolver implements TypeIdResolver {
                         throw new RuntimeException(e);
                     }
                 }).collect(Collectors.toMap(Pair::id, Pair::type));
+    }
+
+    /**
+     * Recursively get all concrete (non-interface) permitted subclasses of a sealed type.
+     */
+    private static java.util.stream.Stream<Class<?>> getAllConcretePermittedClasses(Class<?> sealedType) {
+        if (sealedType.getPermittedSubclasses() == null) {
+            return java.util.stream.Stream.empty();
+        }
+        return Arrays.stream(sealedType.getPermittedSubclasses())
+                .flatMap(c -> {
+                    if (c.isInterface() || c.isSealed()) {
+                        // Recurse into sub-interfaces or sealed classes
+                        return getAllConcretePermittedClasses(c);
+                    } else {
+                        // Concrete class
+                        return java.util.stream.Stream.of(c);
+                    }
+                });
     }
 
     @Override

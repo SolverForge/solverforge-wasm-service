@@ -10,7 +10,7 @@ import ai.timefold.solver.core.api.domain.variable.CascadingUpdateShadowVariable
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public final class DomainCascadingUpdateShadowVariable implements PlanningAnnotation {
+public final class DomainCascadingUpdateShadowVariable implements ShadowVariableAnnotation {
     @JsonProperty("target_method_name")
     String targetMethodName;
 
@@ -40,14 +40,6 @@ public final class DomainCascadingUpdateShadowVariable implements PlanningAnnota
      */
     @Override
     public boolean definesPlanningEntity() {
-        return true;
-    }
-
-    /**
-     * Shadow variables count as "planning variable or shadow variable" for entity validation.
-     */
-    @Override
-    public boolean isShadowVariable() {
         return true;
     }
 

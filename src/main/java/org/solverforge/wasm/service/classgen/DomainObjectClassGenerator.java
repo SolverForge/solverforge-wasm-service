@@ -39,8 +39,9 @@ import org.solverforge.wasm.service.dto.PlanningProblem;
 import org.solverforge.wasm.service.dto.annotation.DomainCascadingUpdateShadowVariable;
 import org.solverforge.wasm.service.dto.annotation.DomainPlanningListVariable;
 import org.solverforge.wasm.service.dto.annotation.DomainPlanningScore;
-import org.solverforge.wasm.service.dto.annotation.DomainPlanningVariable;
 import org.solverforge.wasm.service.dto.annotation.DomainValueRangeProvider;
+import org.solverforge.wasm.service.dto.annotation.PlanningVariableAnnotation;
+import org.solverforge.wasm.service.dto.annotation.ShadowVariableAnnotation;
 
 import com.dylibso.chicory.runtime.ExportFunction;
 import com.dylibso.chicory.runtime.Instance;
@@ -300,8 +301,8 @@ public class DomainObjectClassGenerator {
                     isPlanningEntity |= annotation.definesPlanningEntity();
                     isPlanningSolution |= annotation.definesPlanningSolution();
                     isPlanningScore |= annotation instanceof DomainPlanningScore;
-                    isPlanningVariable |= annotation instanceof DomainPlanningVariable;
-                    isShadowVariable |= annotation.isShadowVariable();
+                    isPlanningVariable |= annotation instanceof PlanningVariableAnnotation;
+                    isShadowVariable |= annotation instanceof ShadowVariableAnnotation;
                     if (annotation instanceof DomainPlanningListVariable plv) {
                         planningListVariable = plv;
                     }

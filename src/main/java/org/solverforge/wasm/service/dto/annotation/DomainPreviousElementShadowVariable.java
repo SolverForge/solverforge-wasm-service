@@ -10,7 +10,7 @@ import ai.timefold.solver.core.api.domain.variable.PreviousElementShadowVariable
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public final class DomainPreviousElementShadowVariable implements PlanningAnnotation {
+public final class DomainPreviousElementShadowVariable implements ShadowVariableAnnotation {
     @JsonProperty("source_variable_name")
     String sourceVariableName;
 
@@ -43,11 +43,4 @@ public final class DomainPreviousElementShadowVariable implements PlanningAnnota
         return true;
     }
 
-    /**
-     * Shadow variables count as "planning variable or shadow variable" for entity validation.
-     */
-    @Override
-    public boolean isShadowVariable() {
-        return true;
-    }
 }
