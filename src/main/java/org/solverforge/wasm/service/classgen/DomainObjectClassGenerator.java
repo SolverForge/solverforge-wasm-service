@@ -473,6 +473,35 @@ public class DomainObjectClassGenerator {
                                     codeBuilder.loadConstant(0);
                                     codeBuilder.laload();
 
+                                    // Save result to local 2 for reuse
+                                    codeBuilder.lstore(2);
+
+                                    // Sync result back to WASM memory so constraints see updated value
+                                    var setterFunctionName = field.getValue().getAccessor().setterFunctionName();
+                                    if (setterFunctionName != null) {
+                                        codeBuilder.aload(0);
+                                        codeBuilder.getfield(wasmObjectDesc, "wasmInstance", instanceDesc);
+                                        codeBuilder.loadConstant(setterFunctionName);
+                                        codeBuilder.invokevirtual(instanceDesc, "export", MethodTypeDesc.of(getDescriptor(ExportFunction.class), stringDesc));
+                                        codeBuilder.loadConstant(2);
+                                        codeBuilder.newarray(TypeKind.LONG);
+                                        codeBuilder.dup();
+                                        codeBuilder.loadConstant(0);
+                                        codeBuilder.aload(0);
+                                        codeBuilder.getfield(wasmObjectDesc, "memoryPointer", intDesc);
+                                        codeBuilder.i2l();
+                                        codeBuilder.lastore();
+                                        codeBuilder.dup();
+                                        codeBuilder.loadConstant(1);
+                                        codeBuilder.lload(2);
+                                        codeBuilder.lastore();
+                                        codeBuilder.invokeinterface(getDescriptor(ExportFunction.class), "apply", MethodTypeDesc.of(longDesc.arrayType(), longDesc.arrayType()));
+                                        codeBuilder.pop();
+                                    }
+
+                                    // Reload result for Java field update
+                                    codeBuilder.lload(2);
+
                                     // Check if result is 0 (null marker) or actual value
                                     codeBuilder.dup2();
                                     codeBuilder.lconst_0();
