@@ -81,7 +81,7 @@ public class PlanningProblem {
         this.deallocator = deallocator;
         this.solutionDeallocator = (solutionDeallocator != null)? solutionDeallocator : deallocator;
         this.listAccessor = listAccessor;
-        this.terminationConfig = (terminationConfig != null)? terminationConfig : new PlanningTermination().withDiminishedReturns(new PlanningDiminishedReturns());
+        this.terminationConfig = (terminationConfig != null)? terminationConfig : new PlanningTermination();
         this.precomputed = precomputed;
 
         entityClassList = new ArrayList<>();
