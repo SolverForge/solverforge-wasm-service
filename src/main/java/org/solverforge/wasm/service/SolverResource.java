@@ -277,7 +277,8 @@ public class SolverResource {
         ai.timefold.solver.core.api.solver.Solver<Object> solver,
         MutableReference<String> bestSolution,
         MutableReference<Score<?>> bestScore,
-        java.util.concurrent.atomic.AtomicBoolean solving
+        java.util.concurrent.atomic.AtomicBoolean solving,
+        MutableReference<String> errorMessage
     ) {}
 
     private static final ConcurrentHashMap<String, AsyncSolveContext> ASYNC_CONTEXTS = new ConcurrentHashMap<>();
@@ -337,6 +338,7 @@ public class SolverResource {
             var bestSolutionRef = new MutableReference<String>(planningProblem.getProblem());
             var bestScoreRef = new MutableReference<Score<?>>(null);
             var solving = new java.util.concurrent.atomic.AtomicBoolean(true);
+            var errorMessageRef = new MutableReference<String>(null);
 
             solver.addEventListener(event -> {
                 bestSolutionRef.setValue(event.getNewBestSolution().toString());
@@ -346,7 +348,7 @@ public class SolverResource {
             // Store context for later queries
             var context = new AsyncSolveContext(
                 wasmInstance, classLoader, listAccessor, exportCache, functionCache,
-                allocator, solver, bestSolutionRef, bestScoreRef, solving
+                allocator, solver, bestSolutionRef, bestScoreRef, solving, errorMessageRef
             );
             ASYNC_CONTEXTS.put(solveId, context);
 
@@ -362,6 +364,16 @@ public class SolverResource {
                     solver.solve(solverInput);
                 } catch (Exception e) {
                     LOG.error("Solve failed", e);
+                    // Capture full exception chain for diagnostics
+                    var sb = new StringBuilder();
+                    sb.append(e.getClass().getName()).append(": ").append(e.getMessage());
+                    Throwable cause = e.getCause();
+                    while (cause != null) {
+                        sb.append("\n  Caused by: ").append(cause.getClass().getName())
+                          .append(": ").append(cause.getMessage());
+                        cause = cause.getCause();
+                    }
+                    errorMessageRef.setValue(sb.toString());
                 } finally {
                     solving.set(false);
                     GENERATED_CLASS_LOADER.remove();
@@ -395,8 +407,9 @@ public class SolverResource {
 
         String state = context.solving().get() ? "RUNNING" : "TERMINATED";
         Score<?> bestScore = context.bestScore().getValue();
+        String error = context.errorMessage().getValue();
 
-        return new SolveStatusResponse(state, 0L, bestScore, null);
+        return new SolveStatusResponse(state, 0L, bestScore, error);
     }
 
     @GET
