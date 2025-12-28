@@ -763,6 +763,7 @@ public class HostFunctionProvider {
 
     /**
      * Serialize an object reference to JSON.
+     * Only outputs the planning ID to avoid infinite recursion from circular references.
      */
     private void serializeObjectReference(Instance instance, ExportFunction listSize,
             ExportFunction getItem, int ptr, String refType, StringBuilder out) {
@@ -780,9 +781,39 @@ public class HostFunctionProvider {
             return;
         }
 
+        // Full serialization (may infinite loop on circular references)
         out.append("{");
         serializeEntityObject(instance, listSize, getItem, refPtr, refDef, out);
         out.append("}");
+    }
+
+    /**
+     * Serialize only the planning ID of an object (to avoid circular references).
+     */
+    private void serializePlanningIdOnly(Instance instance, int ptr, DomainObject def, StringBuilder out) {
+        int offset = 0;
+
+        for (var entry : def.getFieldDescriptorMap().entrySet()) {
+            FieldDescriptor field = entry.getValue();
+
+            // Align offset for this field's type
+            int fieldAlignment = getFieldAlignment(field.getType());
+            offset = alignOffset(offset, fieldAlignment);
+
+            boolean isPlanningId = field.getAnnotations() != null &&
+                    field.getAnnotations().stream()
+                            .anyMatch(a -> a.getClass().getSimpleName().equals("DomainPlanningId"));
+
+            if (isPlanningId) {
+                // Output just the ID value (not wrapped in an object)
+                serializePrimitive(instance, ptr + offset, field.getType(), out);
+                return;
+            }
+
+            offset += getFieldSize(field.getType());
+        }
+
+        throw new IllegalStateException("No @PlanningId field found in " + def.getName() + " - cannot serialize object reference");
     }
 
     /**

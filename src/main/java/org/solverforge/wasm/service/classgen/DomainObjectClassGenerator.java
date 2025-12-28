@@ -451,105 +451,132 @@ public class DomainObjectClassGenerator {
                             (fieldType.equals("LocalDateTime") ||
                              fieldType.equalsIgnoreCase("datetime") ||
                              fieldType.contains("DateTime"));
+                        var ownerClassDesc = ClassDesc.of(domainObject.getName());
+                        var fieldName = field.getKey();
+
                         classBuilder.withMethodBody(targetMethodName,
                                 MethodTypeDesc.of(voidDesc), ClassFile.ACC_PUBLIC, codeBuilder -> {
+                                    var sm = new StackMachine(codeBuilder, targetMethodName);
+
                                     // Call WASM update function: result = updateFunction(this.memoryPointer)
-                                    codeBuilder.aload(0);
-                                    codeBuilder.getfield(wasmObjectDesc, "wasmInstance", instanceDesc);
-                                    codeBuilder.loadConstant(updateFunctionName);
-                                    codeBuilder.invokevirtual(instanceDesc, "export", MethodTypeDesc.of(getDescriptor(ExportFunction.class), stringDesc));
+                                    sm.pushThis()
+                                      .getField(wasmObjectDesc, "wasmInstance", instanceDesc)
+                                      .raw().loadConstant(updateFunctionName);
+                                    sm.stack_push(StackMachine.StackType.REFERENCE, "updateFunctionName");
+                                    sm.invokeVirtual(instanceDesc, "export",
+                                            MethodTypeDesc.of(getDescriptor(ExportFunction.class), stringDesc));
 
                                     // Prepare args array: new long[] { memoryPointer }
-                                    codeBuilder.loadConstant(1);
-                                    codeBuilder.newarray(TypeKind.LONG);
-                                    codeBuilder.dup();
-                                    codeBuilder.loadConstant(0);
-                                    codeBuilder.aload(0);
-                                    codeBuilder.getfield(wasmObjectDesc, "memoryPointer", intDesc);
-                                    codeBuilder.i2l();
-                                    codeBuilder.lastore();
+                                    sm.pushInt(1)
+                                      .newArray(TypeKind.LONG)
+                                      .dup()
+                                      .pushInt(0)
+                                      .pushThis()
+                                      .getField(wasmObjectDesc, "memoryPointer", intDesc)
+                                      .i2l()
+                                      .arrayStore(StackMachine.StackType.LONG);
 
                                     // Call the function
-                                    codeBuilder.invokeinterface(getDescriptor(ExportFunction.class), "apply", MethodTypeDesc.of(longDesc.arrayType(), longDesc.arrayType()));
+                                    sm.invokeInterface(getDescriptor(ExportFunction.class), "apply",
+                                            MethodTypeDesc.of(longDesc.arrayType(), longDesc.arrayType()));
 
                                     // Get result (epoch seconds for datetime, or value for other types)
-                                    codeBuilder.loadConstant(0);
-                                    codeBuilder.laload();
+                                    sm.pushInt(0)
+                                      .arrayLoad(StackMachine.StackType.LONG);
 
                                     // Save result to local 2 for reuse
-                                    codeBuilder.lstore(2);
+                                    sm.storeLongLocal(2, "result");
 
                                     // Sync result back to WASM memory so constraints see updated value
                                     var setterFunctionName = field.getValue().getAccessor().setterFunctionName();
                                     if (setterFunctionName != null) {
-                                        codeBuilder.aload(0);
-                                        codeBuilder.getfield(wasmObjectDesc, "wasmInstance", instanceDesc);
-                                        codeBuilder.loadConstant(setterFunctionName);
-                                        codeBuilder.invokevirtual(instanceDesc, "export", MethodTypeDesc.of(getDescriptor(ExportFunction.class), stringDesc));
-                                        codeBuilder.loadConstant(2);
-                                        codeBuilder.newarray(TypeKind.LONG);
-                                        codeBuilder.dup();
-                                        codeBuilder.loadConstant(0);
-                                        codeBuilder.aload(0);
-                                        codeBuilder.getfield(wasmObjectDesc, "memoryPointer", intDesc);
-                                        codeBuilder.i2l();
-                                        codeBuilder.lastore();
-                                        codeBuilder.dup();
-                                        codeBuilder.loadConstant(1);
-                                        codeBuilder.lload(2);
-                                        codeBuilder.lastore();
-                                        codeBuilder.invokeinterface(getDescriptor(ExportFunction.class), "apply", MethodTypeDesc.of(longDesc.arrayType(), longDesc.arrayType()));
-                                        codeBuilder.pop();
+                                        sm.pushThis()
+                                          .getField(wasmObjectDesc, "wasmInstance", instanceDesc)
+                                          .raw().loadConstant(setterFunctionName);
+                                        sm.stack_push(StackMachine.StackType.REFERENCE, "setterFunctionName");
+                                        sm.invokeVirtual(instanceDesc, "export",
+                                                MethodTypeDesc.of(getDescriptor(ExportFunction.class), stringDesc));
+
+                                        // Build args array: new long[] { memoryPointer, resultValue }
+                                        sm.pushInt(2)
+                                          .newArray(TypeKind.LONG)
+                                          .dup()
+                                          .pushInt(0)
+                                          .pushThis()
+                                          .getField(wasmObjectDesc, "memoryPointer", intDesc)
+                                          .i2l()
+                                          .arrayStore(StackMachine.StackType.LONG)
+                                          .dup()
+                                          .pushInt(1)
+                                          .loadLongLocal(2, "result")
+                                          .arrayStore(StackMachine.StackType.LONG);
+
+                                        sm.invokeInterface(getDescriptor(ExportFunction.class), "apply",
+                                                MethodTypeDesc.of(longDesc.arrayType(), longDesc.arrayType()))
+                                          .pop1();
                                     }
 
-                                    // Reload result for Java field update
-                                    codeBuilder.lload(2);
+                                    // Load result and check if null (0 = null marker)
+                                    sm.loadLongLocal(2, "result")
+                                      .dup2()
+                                      .pushLong(0);
+                                    sm.lcmp();
 
-                                    // Check if result is 0 (null marker) or actual value
-                                    codeBuilder.dup2();
-                                    codeBuilder.lconst_0();
-                                    codeBuilder.lcmp();
-                                    var notNullLabel = codeBuilder.newLabel();
-                                    var endLabel = codeBuilder.newLabel();
-                                    codeBuilder.ifne(notNullLabel);
+                                    var notNullLabel = sm.newLabel();
+                                    var endLabel = sm.newLabel();
+                                    sm.ifne(notNullLabel);
 
                                     // Result is 0, set field to null
-                                    codeBuilder.pop2();
-                                    codeBuilder.aload(0);
-                                    codeBuilder.aconst_null();
-                                    codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
-                                    codeBuilder.goto_(endLabel);
+                                    // Stack: [long] - the duplicated result
+                                    sm.pop2()
+                                      .pushThis()
+                                      .pushNull()
+                                      .putField(ownerClassDesc, fieldName, wrapperTypeDesc)
+                                      .goto_(endLabel);
 
                                     // Result is non-zero, convert and store
-                                    codeBuilder.labelBinding(notNullLabel);
+                                    sm.labelBinding(notNullLabel);
+                                    // Stack: [long] - the duplicated result
+
                                     if (isDateTime) {
                                         // Convert epoch seconds to LocalDateTime
+                                        // Stack: [long epochSeconds]
+                                        // Need: LocalDateTime.ofEpochSecond(epochSeconds, 0, ZoneOffset.UTC)
+
                                         var localDateTimeDesc = ClassDesc.of("java.time.LocalDateTime");
                                         var zoneOffsetDesc = ClassDesc.of("java.time.ZoneOffset");
-                                        codeBuilder.lconst_0();
-                                        codeBuilder.l2i();
-                                        codeBuilder.getstatic(zoneOffsetDesc, "UTC", zoneOffsetDesc);
-                                        codeBuilder.invokestatic(localDateTimeDesc, "ofEpochSecond",
+
+                                        // Arguments for ofEpochSecond(long, int, ZoneOffset)
+                                        // Stack already has: [long epochSeconds]
+                                        sm.pushInt(0);  // nanoOfSecond = 0
+                                        sm.getStatic(zoneOffsetDesc, "UTC", zoneOffsetDesc);
+                                        sm.invokeStatic(localDateTimeDesc, "ofEpochSecond",
                                                 MethodTypeDesc.of(localDateTimeDesc, longDesc, intDesc, zoneOffsetDesc));
-                                        codeBuilder.aload(0);
-                                        codeBuilder.swap();
-                                        codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
+
+                                        // Stack: [LocalDateTime]
+                                        // Need: [this, LocalDateTime] for putfield
+                                        sm.pushThis()
+                                          .swap()
+                                          .putField(ownerClassDesc, fieldName, wrapperTypeDesc);
                                     } else {
-                                        // Stack has: long value
-                                        // Need to store in field (possibly boxing first)
-                                        codeBuilder.aload(0);
-                                        // Stack: long, this -> need: this, long
-                                        codeBuilder.dup_x2();
-                                        codeBuilder.pop();
-                                        // Stack: this, long
+                                        // Stack: [long value]
+                                        // Need: [this, Long/long] for putfield
+
+                                        // Approach: load this, then use dup_x2 to move it below the long
+                                        sm.pushThis()
+                                          .dup_x2()
+                                          .pop1();
+                                        // Stack: [this, long]
+
                                         if (!wrapperTypeDesc.equals(longDesc)) {
-                                            codeBuilder.invokestatic(getDescriptor(Long.class), "valueOf", MethodTypeDesc.of(getDescriptor(Long.class), longDesc));
+                                            sm.invokeStatic(getDescriptor(Long.class), "valueOf",
+                                                    MethodTypeDesc.of(getDescriptor(Long.class), longDesc));
                                         }
-                                        codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
+                                        sm.putField(ownerClassDesc, fieldName, wrapperTypeDesc);
                                     }
 
-                                    codeBuilder.labelBinding(endLabel);
-                                    codeBuilder.return_();
+                                    sm.labelBinding(endLabel);
+                                    sm.returnVoid();
                                 });
                     }
                 }
@@ -787,6 +814,33 @@ public class DomainObjectClassGenerator {
             }
             case "String" -> {
                 throw new UnsupportedOperationException();
+            }
+            case "datetime", "localdatetime", "LocalDateTime" -> {
+                // Convert LocalDateTime to epoch seconds for WASM
+                // Stack before: [array, int, LocalDateTime]
+                var localDateTimeDesc = ClassDesc.of("java.time.LocalDateTime");
+                var zoneOffsetDesc = ClassDesc.of("java.time.ZoneOffset");
+
+                var isNotNullLabel = codeBuilder.newLabel();
+                var doneLabel = codeBuilder.newLabel();
+                codeBuilder.dup();  // [array, int, LocalDateTime, LocalDateTime]
+                codeBuilder.aconst_null();  // [array, int, LocalDateTime, LocalDateTime, null]
+                codeBuilder.if_acmpne(isNotNullLabel);  // [array, int, LocalDateTime]
+
+                // Null branch: replace with 0L
+                codeBuilder.pop();  // [array, int]
+                codeBuilder.loadConstant(0L);  // [array, int, long]
+                codeBuilder.goto_(doneLabel);
+
+                // Non-null branch: convert to epoch seconds
+                codeBuilder.labelBinding(isNotNullLabel);
+                // Stack: [array, int, LocalDateTime]
+                codeBuilder.getstatic(zoneOffsetDesc, "UTC", zoneOffsetDesc);  // [array, int, LocalDateTime, ZoneOffset]
+                codeBuilder.invokevirtual(localDateTimeDesc, "toEpochSecond",
+                        MethodTypeDesc.of(longDesc, zoneOffsetDesc));  // [array, int, long]
+
+                codeBuilder.labelBinding(doneLabel);
+                // Stack: [array, int, long] - ready for lastore
             }
             default -> {
                 var isNotNullLabel = codeBuilder.newLabel();
