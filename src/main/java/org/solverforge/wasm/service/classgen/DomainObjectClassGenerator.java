@@ -420,21 +420,20 @@ public class DomainObjectClassGenerator {
                                     codeBuilder.invokevirtual(wasmObjectDesc, "invalidateFunctionCache", MethodTypeDesc.of(voidDesc));
                                 }
 
-                                // Shadow variables are managed by the solver, no WASM sync needed
-                                if (finalIsPlanningScore || finalIsShadowVariable) {
+                                // Score is managed by the solver and not read from WASM, no sync needed
+                                if (finalIsPlanningScore) {
+                                    codeBuilder.return_();
+                                } else if (field.getValue().getAccessor() != null && field.getValue().getAccessor().setterFunctionName() != null) {
+                                    // Sync value to WASM memory (including shadow variables for cascading updates)
+                                    writeWasmFieldUsingAccessor(field.getValue(), codeBuilder, valueBuilder -> {
+                                        valueBuilder.loadLocal(getTypeKind(field.getValue().getType()), 1);
+                                    });
                                     codeBuilder.return_();
                                 } else {
-                                    if (field.getValue().getAccessor() != null && field.getValue().getAccessor().setterFunctionName() != null) {
-                                        writeWasmFieldUsingAccessor(field.getValue(), codeBuilder, valueBuilder -> {
-                                            valueBuilder.loadLocal(getTypeKind(field.getValue().getType()), 1);
-                                        });
-                                        codeBuilder.return_();
-                                    }else {
-                                        codeBuilder.new_(getDescriptor(UnsupportedOperationException.class));
-                                        codeBuilder.dup();
-                                        codeBuilder.invokespecial(getDescriptor(UnsupportedOperationException.class), "<init>", MethodTypeDesc.of(voidDesc));
-                                        codeBuilder.athrow();
-                                    }
+                                    codeBuilder.new_(getDescriptor(UnsupportedOperationException.class));
+                                    codeBuilder.dup();
+                                    codeBuilder.invokespecial(getDescriptor(UnsupportedOperationException.class), "<init>", MethodTypeDesc.of(voidDesc));
+                                    codeBuilder.athrow();
                                 }
                             });
 
