@@ -345,7 +345,17 @@ public class DomainObjectClassGenerator {
                                     // Score and shadow variables are managed by the solver/update methods - read field directly
                                     codeBuilder.aload(0);
                                     codeBuilder.getfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
-                                    codeBuilder.return_(TypeKind.REFERENCE);
+                                    // Unbox if needed (field is stored as wrapper but getter returns primitive)
+                                    if (!wrapperTypeDesc.equals(typeDesc)) {
+                                        codeBuilder.invokevirtual(wrapperTypeDesc, switch (field.getValue().getType()) {
+                                            case "int" -> "intValue";
+                                            case "long" -> "longValue";
+                                            case "float" -> "floatValue";
+                                            case "double" -> "doubleValue";
+                                            default -> throw new IllegalStateException("Unexpected primitive type: " + field.getValue().getType());
+                                        }, MethodTypeDesc.of(typeDesc));
+                                    }
+                                    codeBuilder.return_(getTypeKind(field.getValue().getType()));
                                 } else {
                                     if (field.getValue().getAccessor() != null) {
                                         codeBuilder.aload(0);
@@ -494,11 +504,15 @@ public class DomainObjectClassGenerator {
                                         codeBuilder.swap();
                                         codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
                                     } else {
-                                        codeBuilder.l2i();
+                                        // Stack has: long value
+                                        // Need to store in field (possibly boxing first)
                                         codeBuilder.aload(0);
-                                        codeBuilder.swap();
-                                        if (!wrapperTypeDesc.equals(typeDesc)) {
-                                            codeBuilder.invokestatic(wrapperTypeDesc, "valueOf", MethodTypeDesc.of(wrapperTypeDesc, typeDesc));
+                                        // Stack: long, this -> need: this, long
+                                        codeBuilder.dup_x2();
+                                        codeBuilder.pop();
+                                        // Stack: this, long
+                                        if (!wrapperTypeDesc.equals(longDesc)) {
+                                            codeBuilder.invokestatic(getDescriptor(Long.class), "valueOf", MethodTypeDesc.of(getDescriptor(Long.class), longDesc));
                                         }
                                         codeBuilder.putfield(ClassDesc.of(domainObject.getName()), field.getKey(), wrapperTypeDesc);
                                     }
