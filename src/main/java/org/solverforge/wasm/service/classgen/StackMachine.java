@@ -51,7 +51,7 @@ public class StackMachine {
         FLOAT(Category.CAT1, TypeKind.FLOAT),
         DOUBLE(Category.CAT2, TypeKind.DOUBLE),
         REFERENCE(Category.CAT1, TypeKind.REFERENCE),
-        /** Uninitialized reference from 'new' instruction, before <init> */
+        /** Uninitialized reference from 'new' instruction, before {@code <init>} */
         UNINITIALIZED(Category.CAT1, TypeKind.REFERENCE);
 
         public final Category category;
